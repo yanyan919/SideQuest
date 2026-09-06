@@ -4,6 +4,16 @@
 jQuery(async () => {
     if (document.getElementById('sidequest-root')) return;
 
+    const STORAGE_KEY = 'sidequest_settings_v1';
+    const defaults = {
+        autoListen: true,
+        includeUser: true,
+        includeNarration: false,
+        whoSaidIt: true,
+    };
+
+    let settings = loadSettings();
+
     const root = document.createElement('section');
     root.id = 'sidequest-root';
     root.innerHTML = `
@@ -13,11 +23,14 @@ jQuery(async () => {
 
         <div id="sidequest-panel" class="sidequest-hidden" aria-hidden="true">
             <div class="sidequest-panel-header">
-                <div>
+                <div class="sidequest-drag-handle" title="Drag to move">
                     <div class="sidequest-title">SideQuest</div>
                     <div class="sidequest-subtitle">Tiny games between stories</div>
                 </div>
-                <button id="sidequest-close" class="sidequest-icon-button" type="button" aria-label="Close">×</button>
+                <div class="sidequest-header-actions">
+                    <button id="sidequest-settings-button" class="sidequest-icon-button" type="button" aria-label="Settings" title="Settings">⚙</button>
+                    <button id="sidequest-close" class="sidequest-icon-button" type="button" aria-label="Close">×</button>
+                </div>
             </div>
 
             <div class="sidequest-panel-body">
@@ -42,6 +55,30 @@ jQuery(async () => {
                 </div>
 
                 <div class="sidequest-source" id="sidequest-source" hidden></div>
+
+                <div class="sidequest-settings-view" id="sidequest-settings-view" hidden>
+                    <div class="sidequest-settings-title">Settings</div>
+                    <div class="sidequest-settings-note">Make SideQuest behave the way you like. Changes save automatically.</div>
+
+                    <label class="sidequest-setting-row">
+                        <span><strong>Auto-listen</strong><small>Watch new RP messages and refresh quests automatically.</small></span>
+                        <input id="sq-setting-auto" type="checkbox">
+                    </label>
+                    <label class="sidequest-setting-row">
+                        <span><strong>Include my messages</strong><small>Allow your own dialogue to become a source for games.</small></span>
+                        <input id="sq-setting-user" type="checkbox">
+                    </label>
+                    <label class="sidequest-setting-row">
+                        <span><strong>Include narration</strong><small>Allow narration to become a source when a game supports it.</small></span>
+                        <input id="sq-setting-narration" type="checkbox">
+                    </label>
+                    <label class="sidequest-setting-row">
+                        <span><strong>Who said it?</strong><small>Keep the first mini-game enabled.</small></span>
+                        <input id="sq-setting-who" type="checkbox">
+                    </label>
+
+                    <button id="sidequest-back" class="sidequest-back-button" type="button">← Back to quests</button>
+                </div>
             </div>
 
             <div class="sidequest-panel-footer">
@@ -56,6 +93,8 @@ jQuery(async () => {
     const fab = root.querySelector('#sidequest-fab');
     const panel = root.querySelector('#sidequest-panel');
     const close = root.querySelector('#sidequest-close');
+    const settingsButton = root.querySelector('#sidequest-settings-button');
+    const backButton = root.querySelector('#sidequest-back');
     const status = root.querySelector('#sidequest-status');
     const emptyState = root.querySelector('#sidequest-empty-state');
     const gameCard = root.querySelector('#sidequest-game-card');
@@ -63,18 +102,60 @@ jQuery(async () => {
     const options = root.querySelector('#sidequest-options');
     const feedback = root.querySelector('#sidequest-feedback');
     const source = root.querySelector('#sidequest-source');
+    const settingsView = root.querySelector('#sidequest-settings-view');
 
-    const setOpen = (open) => {
+    const settingInputs = {
+        autoListen: root.querySelector('#sq-setting-auto'),
+        includeUser: root.querySelector('#sq-setting-user'),
+        includeNarration: root.querySelector('#sq-setting-narration'),
+        whoSaidIt: root.querySelector('#sq-setting-who'),
+    };
+
+    for (const [key, input] of Object.entries(settingInputs)) input.checked = settings[key];
+
+    function loadSettings() {
+        try {
+            return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') };
+        } catch {
+            return { ...defaults };
+        }
+    }
+
+    function saveSettings() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
+
+    function setOpen(open) {
         panel.classList.toggle('sidequest-hidden', !open);
         panel.setAttribute('aria-hidden', String(!open));
         fab.setAttribute('aria-expanded', String(open));
-    };
+    }
 
-    fab.addEventListener('click', () => {
-        setOpen(panel.classList.contains('sidequest-hidden'));
-    });
+    function showSettings(show) {
+        settingsView.hidden = !show;
+        settingsButton.classList.toggle('sidequest-active', show);
+        if (show) {
+            emptyState.hidden = true;
+            gameCard.hidden = true;
+            source.hidden = true;
+        } else {
+            buildWhoSaidIt();
+        }
+    }
 
+    fab.addEventListener('click', () => setOpen(panel.classList.contains('sidequest-hidden')));
     close.addEventListener('click', () => setOpen(false));
+    settingsButton.addEventListener('click', () => showSettings(settingsView.hidden));
+    backButton.addEventListener('click', () => showSettings(false));
+
+    for (const [key, input] of Object.entries(settingInputs)) {
+        input.addEventListener('change', () => {
+            settings[key] = input.checked;
+            saveSettings();
+            if (!settingsView.hidden) return;
+            buildWhoSaidIt();
+        });
+    }
 
     function setStatus(text, active = false) {
         status.querySelector('span:last-child').textContent = text;
@@ -110,22 +191,15 @@ jQuery(async () => {
             .slice(-limit);
     }
 
-    // Reads the actual ST message objects, so the plugin does not have to guess
-    // whether a line belongs to the user or to a character.
     function collectParticipants(messages) {
         const participants = new Map();
-
         for (const { message } of messages) {
             const role = messageRole(message);
             if (role === 'system') continue;
-
             const name = displayName(message);
-            if (!participants.has(name)) {
-                participants.set(name, { name, role, count: 0 });
-            }
+            if (!participants.has(name)) participants.set(name, { name, role, count: 0 });
             participants.get(name).count += 1;
         }
-
         return [...participants.values()];
     }
 
@@ -133,12 +207,10 @@ jQuery(async () => {
         const lines = [];
         const quoted = /[“"]([^“”"]{8,220})[”"]/g;
         let match;
-
         while ((match = quoted.exec(text)) !== null) {
             const line = match[1].trim();
             if (line) lines.push({ speaker: fallbackSpeaker, line });
         }
-
         return lines;
     }
 
@@ -146,34 +218,30 @@ jQuery(async () => {
         const text = cleanText(message.mes);
         const fallbackSpeaker = displayName(message);
         const lines = [];
-
-        // Explicit speaker labels inside a message take priority.
-        // Example: Peregrine: “I suppose you could stay for dinner.”
-        const labeled = /(?:^|\s)([A-Za-z][A-Za-z0-9 _'’.-]{0,40})\s*[:：]\s*[“"]([^“”"]{8,220})[”"]/g;
         let match;
-        while ((match = labeled.exec(text)) !== null) {
-            lines.push({ speaker: match[1].trim(), line: match[2].trim() });
-        }
 
+        // Optional explicit-label parser. It is language-agnostic and does not hard-code characters.
+        const labeled = /(?:^|\s)([^:\n]{1,50})\s*[:：]\s*[“"「『]([^”"」』\n]{8,220})[”"」』]/g;
+        while ((match = labeled.exec(text)) !== null) {
+            const candidate = match[1].trim();
+            if (candidate && !/^[\W_]+$/.test(candidate)) {
+                lines.push({ speaker: candidate, line: match[2].trim() });
+            }
+        }
         if (lines.length) return lines;
 
-        // Normal ST character messages: message.name is the speaker.
-        // User messages are also preserved as "You".
+        // Normal RP cards: quoted dialogue inherits the speaker from ST's message object.
         return extractQuotedLines(text, fallbackSpeaker);
     }
 
     function getCandidateLines(messages) {
         const candidates = [];
-
         for (const { message, index } of messages) {
             const role = messageRole(message);
-            if (role === 'system') continue;
-
             for (const dialogue of extractDialogue(message)) {
                 candidates.push({ ...dialogue, role, messageIndex: index });
             }
         }
-
         return candidates;
     }
 
@@ -190,15 +258,18 @@ jQuery(async () => {
         return copy;
     }
 
-    function chooseTarget(candidates) {
-        // Prefer a recent line, but not always the absolute newest one.
-        const recent = candidates.slice(-8);
-        return recent[Math.floor(Math.random() * recent.length)] || candidates[candidates.length - 1];
-    }
-
     function buildWhoSaidIt() {
+        if (!settings.whoSaidIt) {
+            setStatus('Mini-games are turned off.', false);
+            emptyState.hidden = false;
+            gameCard.hidden = true;
+            source.hidden = true;
+            return;
+        }
+
         const messages = getRecentMessages();
-        if (!messages.length) {
+        const candidates = getCandidateLines(messages);
+        if (!candidates.length) {
             setStatus('Waiting for a story...', false);
             emptyState.hidden = false;
             gameCard.hidden = true;
@@ -206,31 +277,15 @@ jQuery(async () => {
             return;
         }
 
-        const candidates = getCandidateLines(messages);
-        if (!candidates.length) {
-            setStatus('Story found — waiting for dialogue...', false);
-            emptyState.hidden = false;
-            gameCard.hidden = true;
-            source.hidden = false;
-            source.textContent = 'SideQuest is watching the chat. A quoted line will become a quest when one appears.';
-            return;
-        }
-
-        const target = chooseTarget(candidates);
+        const target = candidates[Math.floor(Math.random() * Math.min(8, candidates.length)) + Math.max(0, candidates.length - 8)];
         const participants = collectParticipants(messages).map(item => item.name);
-        let speakers = unique(candidates.map(item => item.speaker));
-
-        // Add real participants from the current chat rather than hard-coded names.
-        speakers = unique([...speakers, ...participants]);
-
-        // Keep the quiz useful even when the current scene contains only one speaker.
-        // The distractors are real people from the active chat whenever possible.
+        const speakers = unique([...candidates.map(item => item.speaker), ...participants]);
         const distractors = shuffle(speakers.filter(name => name !== target.speaker));
         const selected = [target.speaker, ...distractors].slice(0, 3);
 
-        // If there are fewer than 2 real speakers, don't invent fake characters.
+        // Never invent a fake character just to fill the quiz.
         if (selected.length < 2) {
-            setStatus('Dialogue found — need another speaker for this quest.', false);
+            setStatus('Dialogue found — waiting for another speaker...', false);
             emptyState.hidden = false;
             gameCard.hidden = true;
             source.hidden = false;
@@ -238,13 +293,12 @@ jQuery(async () => {
             return;
         }
 
-        const shuffled = shuffle(selected);
         prompt.textContent = `“${target.line}”`;
         options.innerHTML = '';
         feedback.textContent = '';
         feedback.className = 'sidequest-feedback';
 
-        for (const name of shuffled) {
+        for (const name of shuffle(selected)) {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'sidequest-option';
@@ -255,7 +309,6 @@ jQuery(async () => {
                     btn.disabled = true;
                     if (btn.textContent === target.speaker) btn.classList.add('sidequest-correct');
                 });
-
                 if (correct) {
                     button.classList.add('sidequest-correct');
                     feedback.textContent = '✨ Yep! You got it.';
@@ -277,25 +330,23 @@ jQuery(async () => {
     }
 
     function refreshFromChat() {
+        if (!settings.autoListen || !settingsView.hidden) return;
         buildWhoSaidIt();
     }
 
-    // ST's own message objects provide the role information. The event listeners
-    // make SideQuest refresh itself after new turns, edits and swipes.
     if (window.SillyTavern?.eventSource && window.SillyTavern?.eventTypes) {
-        const events = SillyTavern.eventTypes;
+        const events = window.SillyTavern.eventTypes;
         const refreshEvents = unique([
             events.MESSAGE_RECEIVED,
             events.MESSAGE_UPDATED,
             events.MESSAGE_SWIPED,
             events.CHAT_CHANGED,
         ]);
-
         for (const event of refreshEvents) {
-            if (event) SillyTavern.eventSource.on(event, refreshFromChat);
+            if (event) window.SillyTavern.eventSource.on(event, refreshFromChat);
         }
     }
 
     refreshFromChat();
-    console.log('[SideQuest] automatic chat listener ready');
+    console.log('[SideQuest] adaptive listener + settings + mini-game ready');
 });
