@@ -94,7 +94,27 @@
 
 .sidequest-panel-body {
     overflow-y: auto;
-    padding: 18px;
+    padding: 16px 18px 18px;
+}
+
+.sidequest-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 14px;
+    font-size: 10px;
+    opacity: 0.5;
+}
+
+.sidequest-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.sidequest-status-active {
+    opacity: 0.8;
 }
 
 .sidequest-empty-state {
@@ -120,7 +140,7 @@
     opacity: 0.62;
 }
 
-.sidequest-preview-card {
+.sidequest-game-card {
     padding: 14px;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 14px;
@@ -128,36 +148,82 @@
 }
 
 .sidequest-card-label {
-    margin-bottom: 6px;
+    margin-bottom: 10px;
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.12em;
     opacity: 0.48;
 }
 
-.sidequest-card-title {
-    font-size: 14px;
-    font-weight: 650;
+.sidequest-card-prompt {
+    padding: 12px 10px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.14);
+    font-size: 13px;
+    line-height: 1.55;
 }
 
-.sidequest-card-text {
-    margin-top: 5px;
-    font-size: 11px;
-    line-height: 1.5;
-    opacity: 0.62;
-}
-
-.sidequest-demo-button {
-    width: 100%;
+.sidequest-options {
+    display: grid;
+    gap: 7px;
     margin-top: 12px;
-    padding: 8px 10px;
-    border: 0;
+}
+
+.sidequest-option {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 9px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.055);
     color: inherit;
+    font: inherit;
     font-size: 11px;
-    cursor: not-allowed;
-    opacity: 0.5;
+    text-align: left;
+    cursor: pointer;
+    transition: background 120ms ease, transform 120ms ease, opacity 120ms ease;
+}
+
+.sidequest-option:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(2px);
+}
+
+.sidequest-option:disabled {
+    cursor: default;
+    opacity: 0.58;
+}
+
+.sidequest-option.sidequest-correct {
+    background: rgba(100, 190, 125, 0.18);
+    border-color: rgba(100, 190, 125, 0.35);
+    opacity: 1;
+}
+
+.sidequest-option.sidequest-wrong {
+    background: rgba(210, 100, 100, 0.15);
+    border-color: rgba(210, 100, 100, 0.3);
+}
+
+.sidequest-feedback {
+    min-height: 17px;
+    margin-top: 10px;
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+.sidequest-feedback-good {
+    opacity: 0.9;
+}
+
+.sidequest-feedback-bad {
+    opacity: 0.75;
+}
+
+.sidequest-source {
+    margin-top: 9px;
+    font-size: 9px;
+    opacity: 0.35;
+    text-align: right;
 }
 
 .sidequest-panel-footer {
@@ -177,5 +243,19 @@
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 520px) {
+    #sidequest-fab {
+        right: 14px;
+        bottom: 92px;
+    }
+
+    #sidequest-panel {
+        right: 10px;
+        bottom: 148px;
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 180px);
     }
 }
