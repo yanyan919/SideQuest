@@ -16,7 +16,9 @@
     background: rgba(35, 35, 42, 0.94);
     color: inherit;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-    cursor: pointer;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
     z-index: 9999;
     transition: transform 140ms ease, box-shadow 140ms ease;
 }
@@ -26,13 +28,16 @@
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
 }
 
-#sidequest-fab:active {
+#sidequest-fab:active,
+#sidequest-fab.sidequest-dragging {
+    cursor: grabbing;
     transform: scale(0.96);
 }
 
 .sidequest-fab-icon {
     font-size: 23px;
     line-height: 1;
+    pointer-events: none;
 }
 
 #sidequest-panel {
@@ -73,10 +78,17 @@
     flex: 1;
     min-width: 0;
     cursor: grab;
+    touch-action: none;
 }
 
-.sidequest-drag-handle:active {
+.sidequest-drag-handle:active,
+.sidequest-panel.sidequest-dragging .sidequest-drag-handle {
     cursor: grabbing;
+}
+
+.sidequest-panel.sidequest-dragging {
+    animation: none;
+    user-select: none;
 }
 
 .sidequest-title {
