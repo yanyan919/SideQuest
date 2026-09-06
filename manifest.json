@@ -1,8 +1,12 @@
 {
   "display_name": "SideQuest",
-  "version": "0.1.0",
-  "description": "A tiny RP companion for SillyTavern — turning waiting time into playful little side quests.",
-  "author": "yanyan919",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
   "js": "index.js",
-  "css": "style.css"
+  "css": "style.css",
+  "author": "yanyan919",
+  "version": "0.1.0",
+  "homePage": "https://github.com/yanyan919/SideQuest",
+  "auto_update": true
 }
