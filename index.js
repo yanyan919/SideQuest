@@ -13,6 +13,8 @@ jQuery(async () => {
     };
 
     let settings = loadSettings();
+    let fabMoved = false;
+    let panelMoved = false;
 
     const root = document.createElement('section');
     root.id = 'sidequest-root';
@@ -92,6 +94,7 @@ jQuery(async () => {
 
     const fab = root.querySelector('#sidequest-fab');
     const panel = root.querySelector('#sidequest-panel');
+    const dragHandle = root.querySelector('.sidequest-drag-handle');
     const close = root.querySelector('#sidequest-close');
     const settingsButton = root.querySelector('#sidequest-settings-button');
     const backButton = root.querySelector('#sidequest-back');
@@ -129,6 +132,116 @@ jQuery(async () => {
         panel.classList.toggle('sidequest-hidden', !open);
         panel.setAttribute('aria-hidden', String(!open));
         fab.setAttribute('aria-expanded', String(open));
+
+        if (open && !panelMoved) positionPanelNearFab();
+    }
+
+    function positionPanelNearFab() {
+        const fabRect = fab.getBoundingClientRect();
+        const panelWidth = panel.getBoundingClientRect().width || 360;
+        const gap = 14;
+        let left = fabRect.right - panelWidth;
+        let top = fabRect.top - gap - (panel.getBoundingClientRect().height || 620);
+
+        left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
+        top = Math.max(8, Math.min(top, window.innerHeight - 8));
+
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+    }
+
+    function clampElement(element, left, top) {
+        const rect = element.getBoundingClientRect();
+        return {
+            left: Math.max(6, Math.min(left, window.innerWidth - rect.width - 6)),
+            top: Math.max(6, Math.min(top, window.innerHeight - rect.height - 6)),
+        };
+    }
+
+    function makeDraggable(element, handle, onMove) {
+        let dragging = false;
+        let moved = false;
+        let pointerId = null;
+        let startX = 0;
+        let startY = 0;
+        let originLeft = 0;
+        let originTop = 0;
+
+        handle.addEventListener('pointerdown', (event) => {
+            if (event.button !== undefined && event.button !== 0) return;
+            if (event.target.closest('button')) return;
+
+            const rect = element.getBoundingClientRect();
+            pointerId = event.pointerId;
+            startX = event.clientX;
+            startY = event.clientY;
+            originLeft = rect.left;
+            originTop = rect.top;
+            dragging = true;
+            moved = false;
+            handle.setPointerCapture?.(pointerId);
+            element.classList.add('sidequest-dragging');
+            event.preventDefault();
+        });
+
+        handle.addEventListener('pointermove', (event) => {
+            if (!dragging || event.pointerId !== pointerId) return;
+
+            const dx = event.clientX - startX;
+            const dy = event.clientY - startY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+
+            const next = clampElement(element, originLeft + dx, originTop + dy);
+            element.style.left = `${next.left}px`;
+            element.style.top = `${next.top}px`;
+            element.style.right = 'auto';
+            element.style.bottom = 'auto';
+            onMove?.(moved);
+        });
+
+        const stop = (event) => {
+            if (!dragging || (event.pointerId !== undefined && event.pointerId !== pointerId)) return;
+            dragging = false;
+            handle.releasePointerCapture?.(pointerId);
+            pointerId = null;
+            element.classList.remove('sidequest-dragging');
+        };
+
+        handle.addEventListener('pointerup', stop);
+        handle.addEventListener('pointercancel', stop);
+
+        return () => moved;
+    }
+
+    const fabWasDragged = makeDraggable(fab, fab, (moved) => {
+        fabMoved = moved;
+    });
+
+    fab.addEventListener('click', (event) => {
+        if (fabWasDragged()) {
+            event.preventDefault();
+            return;
+        }
+        setOpen(panel.classList.contains('sidequest-hidden'));
+    });
+
+    makeDraggable(panel, dragHandle, (moved) => {
+        panelMoved = moved || panelMoved;
+    });
+
+    close.addEventListener('click', () => setOpen(false));
+    settingsButton.addEventListener('click', () => showSettings(settingsView.hidden));
+    backButton.addEventListener('click', () => showSettings(false));
+
+    for (const [key, input] of Object.entries(settingInputs)) {
+        input.addEventListener('change', () => {
+            settings[key] = input.checked;
+            saveSettings();
+            if (!settingsView.hidden) return;
+            buildWhoSaidIt();
+        });
     }
 
     function showSettings(show) {
@@ -141,20 +254,6 @@ jQuery(async () => {
         } else {
             buildWhoSaidIt();
         }
-    }
-
-    fab.addEventListener('click', () => setOpen(panel.classList.contains('sidequest-hidden')));
-    close.addEventListener('click', () => setOpen(false));
-    settingsButton.addEventListener('click', () => showSettings(settingsView.hidden));
-    backButton.addEventListener('click', () => showSettings(false));
-
-    for (const [key, input] of Object.entries(settingInputs)) {
-        input.addEventListener('change', () => {
-            settings[key] = input.checked;
-            saveSettings();
-            if (!settingsView.hidden) return;
-            buildWhoSaidIt();
-        });
     }
 
     function setStatus(text, active = false) {
@@ -230,7 +329,6 @@ jQuery(async () => {
         }
         if (lines.length) return lines;
 
-        // Normal RP cards: quoted dialogue inherits the speaker from ST's message object.
         return extractQuotedLines(text, fallbackSpeaker);
     }
 
@@ -238,6 +336,7 @@ jQuery(async () => {
         const candidates = [];
         for (const { message, index } of messages) {
             const role = messageRole(message);
+            if (role === 'user' && !settings.includeUser) continue;
             for (const dialogue of extractDialogue(message)) {
                 candidates.push({ ...dialogue, role, messageIndex: index });
             }
@@ -283,7 +382,6 @@ jQuery(async () => {
         const distractors = shuffle(speakers.filter(name => name !== target.speaker));
         const selected = [target.speaker, ...distractors].slice(0, 3);
 
-        // Never invent a fake character just to fill the quiz.
         if (selected.length < 2) {
             setStatus('Dialogue found — waiting for another speaker...', false);
             emptyState.hidden = false;
@@ -347,6 +445,15 @@ jQuery(async () => {
         }
     }
 
+    window.addEventListener('resize', () => {
+        if (!panel.classList.contains('sidequest-hidden') && panelMoved) {
+            const rect = panel.getBoundingClientRect();
+            const next = clampElement(panel, rect.left, rect.top);
+            panel.style.left = `${next.left}px`;
+            panel.style.top = `${next.top}px`;
+        }
+    });
+
     refreshFromChat();
-    console.log('[SideQuest] adaptive listener + settings + mini-game ready');
+    console.log('[SideQuest] floating FAB + draggable panel + settings + mini-game ready');
 });
