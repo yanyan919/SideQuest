@@ -13,7 +13,6 @@ jQuery(async () => {
     };
 
     let settings = loadSettings();
-    let fabMoved = false;
     let panelMoved = false;
 
     const root = document.createElement('section');
@@ -212,12 +211,14 @@ jQuery(async () => {
         handle.addEventListener('pointerup', stop);
         handle.addEventListener('pointercancel', stop);
 
-        return () => moved;
+        return () => {
+            const result = moved;
+            moved = false;
+            return result;
+        };
     }
 
-    const fabWasDragged = makeDraggable(fab, fab, (moved) => {
-        fabMoved = moved;
-    });
+    const fabWasDragged = makeDraggable(fab, fab);
 
     fab.addEventListener('click', (event) => {
         if (fabWasDragged()) {
