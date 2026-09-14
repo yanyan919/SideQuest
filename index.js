@@ -43,6 +43,18 @@ jQuery(async () => {
     const settingInputs = { autoListen: root.querySelector('#sq-setting-auto'), includeUser: root.querySelector('#sq-setting-user'), includeNarration: root.querySelector('#sq-setting-narration'), whoSaidIt: root.querySelector('#sq-setting-who') };
     for (const [key, input] of Object.entries(settingInputs)) input.checked = settings[key];
 
+    // --- SillyTavern context helper ---------------------------------------
+    // Everything ST exposes to third-party extensions lives behind
+    // SillyTavern.getContext() — there is no window.SillyTavern.chat etc.
+    function getContext() {
+        try {
+            return window.SillyTavern?.getContext ? window.SillyTavern.getContext() : null;
+        } catch (error) {
+            console.error('[SideQuest] getContext() failed', error);
+            return null;
+        }
+    }
+
     function loadSettings() { try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; } catch { return { ...defaults }; } }
     function saveSettings() { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }
     function setOpen(open) { panel.classList.toggle('sidequest-hidden', !open); panel.setAttribute('aria-hidden', String(!open)); fab.setAttribute('aria-expanded', String(open)); if (open && !panelMoved) positionPanelNearFab(); }
@@ -83,7 +95,15 @@ jQuery(async () => {
     function cleanText(text) { return String(text ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); }
     function displayName(message) { if (!message) return 'Unknown'; if (message.is_user) return 'You'; if (message.is_system) return 'System'; return String(message.name || message.ch_name || 'Character').trim() || 'Character'; }
     function messageRole(message) { return message?.is_system ? 'system' : message?.is_user ? 'user' : 'character'; }
-    function getRecentMessages(limit = 24) { if (!Array.isArray(window.SillyTavern?.chat)) return []; return SillyTavern.chat.map((message, index) => ({ message, index })).filter(({ message }) => message && !message.is_system && message.mes).slice(-limit); }
+
+    // FIX: read chat log through SillyTavern.getContext(), not window.SillyTavern.chat.
+    function getRecentMessages(limit = 24) {
+        const ctx = getContext();
+        const chat = ctx?.chat;
+        if (!Array.isArray(chat)) return [];
+        return chat.map((message, index) => ({ message, index })).filter(({ message }) => message && !message.is_system && message.mes).slice(-limit);
+    }
+
     function collectParticipants(messages) { const map = new Map(); for (const { message } of messages) { const role = messageRole(message); if (role === 'system') continue; const name = displayName(message); if (!map.has(name)) map.set(name, { name, role, count: 0 }); map.get(name).count++; } return [...map.values()]; }
     function extractQuotedLines(text, fallbackSpeaker) { const lines = [], quoted = /[“"]([^“”"]{8,220})[”"]/g; let match; while ((match = quoted.exec(text)) !== null) { const line = match[1].trim(); if (line) lines.push({ speaker: fallbackSpeaker, line }); } return lines; }
     function extractDialogue(message) {
@@ -115,7 +135,18 @@ jQuery(async () => {
     }
 
     function refreshFromChat() { if (!settings.autoListen || !settingsView.hidden) return; buildWhoSaidIt(); }
-    if (window.SillyTavern?.eventSource && window.SillyTavern?.eventTypes) { const events = window.SillyTavern.eventTypes; for (const event of unique([events.MESSAGE_RECEIVED, events.MESSAGE_UPDATED, events.MESSAGE_SWIPED, events.CHAT_CHANGED])) if (event) window.SillyTavern.eventSource.on(event, refreshFromChat); }
+
+    // FIX: eventSource / eventTypes also come from getContext(), not window.SillyTavern directly.
+    const ctx = getContext();
+    if (ctx?.eventSource && ctx?.eventTypes) {
+        const events = ctx.eventTypes;
+        for (const event of unique([events.MESSAGE_RECEIVED, events.MESSAGE_UPDATED, events.MESSAGE_SWIPED, events.CHAT_CHANGED])) {
+            if (event) ctx.eventSource.on(event, refreshFromChat);
+        }
+    } else {
+        console.warn('[SideQuest] Could not find SillyTavern.getContext().eventSource — auto-refresh on new messages will not work. The panel still opens and can be refreshed manually by reopening it.');
+    }
+
     refreshFromChat();
     console.log('[SideQuest] draggable companion + adaptive dialogue listener ready');
 });
