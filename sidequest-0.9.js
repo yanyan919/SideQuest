@@ -12,9 +12,9 @@ export default 'SideQuest';
     const DEFAULTS = {
         enabled: true,
         includeUser: true,
+        includeCharacter: true,
         includeNarration: false,
-        whoSaidIt: true,
-        wordHunt: true,
+        backgroundUrl: '',
     };
 
     const css = `
@@ -105,6 +105,14 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-settings p { margin:0 0 14px; font-size:11px; opacity:.58; line-height:1.5; }
         #${PANEL_ID} .sq-setting-row { display:flex; align-items:center; gap:9px; padding:9px 0; font-size:12px; }
         #${PANEL_ID} .sq-setting-row input { margin:0; }
+        .sq-details { margin:10px 0; border:1px solid rgba(255,255,255,.10); border-radius:12px; background:rgba(255,255,255,.035); overflow:hidden; }
+        .sq-details summary { cursor:pointer; padding:11px 12px; font-size:12px; font-weight:700; list-style:none; }
+        .sq-details summary::-webkit-details-marker { display:none; }
+        .sq-details summary::after { content:'＋'; float:right; opacity:.55; }
+        .sq-details[open] summary::after { content:'−'; }
+        .sq-details-body { padding:3px 12px 10px; }
+        .sq-setting-label { display:block; font-size:10px; opacity:.55; margin:8px 0 6px; }
+        .sq-url-input { width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid rgba(255,255,255,.12); border-radius:9px; background:rgba(0,0,0,.18); color:#f2f2f2 !important; }
         #${SETTINGS_ID} { margin-top:8px; }
         #${SETTINGS_ID} .sq-note { opacity:.55; font-size:11px; line-height:1.5; }
         @media (max-width:600px) {
@@ -147,6 +155,7 @@ export default 'SideQuest';
         const result = [];
         for (const message of chatMessages()) {
             if (message.is_user && !s.includeUser) continue;
+            if (!message.is_user && !s.includeCharacter) continue;
             const text = clean(message.mes);
             const speaker = message.is_user ? 'You' : (String(message.name || message.ch_name || 'Character').trim() || 'Character');
             let foundQuote = false;
@@ -271,6 +280,20 @@ export default 'SideQuest';
         });
     }
 
+    function applyPanelBackground(panel) {
+        if (!panel) return;
+        const url=String(loadSettings().backgroundUrl||'').trim();
+        if (url) {
+            panel.style.setProperty('background-image','linear-gradient(rgba(20,20,28,.58),rgba(20,20,28,.68)), url("' + url.replace(/"/g,'\\\"') + '")','important');
+            panel.style.setProperty('background-size','cover','important');
+            panel.style.setProperty('background-position','center','important');
+        } else {
+            panel.style.removeProperty('background-image');
+            panel.style.removeProperty('background-size');
+            panel.style.removeProperty('background-position');
+        }
+    }
+
     function createPanel() {
         document.getElementById(PANEL_ID)?.remove();
         const panel=document.createElement('section');
@@ -293,11 +316,23 @@ export default 'SideQuest';
                 </div>
                 <div class="sq-settings" hidden>
                     <h3>SideQuest 设置</h3>
-                    <p>这里只显示你打开的玩法；悬浮窗不会一次把所有游戏塞给你。</p>
-                    <label class="sq-setting-row"><input type="checkbox" data-key="includeUser"><span>把我的对白也作为题目素材</span></label>
-                    <label class="sq-setting-row"><input type="checkbox" data-key="includeNarration"><span>把旁白也作为题目素材</span></label>
-                    <label class="sq-setting-row"><input type="checkbox" data-key="whoSaidIt"><span>Who Said It?</span></label>
-                    <label class="sq-setting-row"><input type="checkbox" data-key="wordHunt"><span>Word Hunt</span></label>
+                    <p>素材来源在这里设置；具体小游戏以后可以直接在窗口里选择。</p>
+                    <details class="sq-details">
+                        <summary>题目素材</summary>
+                        <div class="sq-details-body">
+                            <label class="sq-setting-row"><input type="checkbox" data-key="includeUser"><span>我的对白</span></label>
+                            <label class="sq-setting-row"><input type="checkbox" data-key="includeCharacter"><span>角色对白</span></label>
+                            <label class="sq-setting-row"><input type="checkbox" data-key="includeNarration"><span>旁白</span></label>
+                        </div>
+                    </details>
+                    <details class="sq-details">
+                        <summary>背景</summary>
+                        <div class="sq-details-body">
+                            <label class="sq-setting-label">背景图片 URL</label>
+                            <input class="sq-url-input" type="url" data-key="backgroundUrl" placeholder="粘贴图片 URL">
+                            <div class="sq-note">留空就是默认玻璃面板。</div>
+                        </div>
+                    </details>
                     <button class="sq-back" type="button">← 回去玩</button>
                 </div>
             </div>`;
@@ -305,6 +340,7 @@ export default 'SideQuest';
         // A fixed element under <body> can then stop behaving like a viewport overlay.
         // Put the floating window directly under <html> so it is outside that layout tree.
         (document.documentElement || document.body).appendChild(panel);
+        applyPanelBackground(panel);
 
         const settingsView=panel.querySelector('.sq-settings');
         const mainView=panel.querySelector('.sq-body');
@@ -314,9 +350,12 @@ export default 'SideQuest';
             panel.querySelector('.sq-empty').hidden=true;
             panel.querySelector('.sq-card').hidden=true;
             panel.querySelector('.sq-settings').hidden=false;
-            panel.querySelector('.sq-status').textContent='游戏玩法设置';
+            panel.querySelector('.sq-status').textContent='设置';
             const s=loadSettings();
-            panel.querySelectorAll('[data-key]').forEach(i=>i.checked=!!s[i.dataset.key]);
+            panel.querySelectorAll('[data-key]').forEach(i=>{
+                if (i.type==='checkbox') i.checked=!!s[i.dataset.key];
+                else i.value=String(s[i.dataset.key]||'');
+            });
         };
         const back=()=>{
             settingsView.hidden=true;
@@ -345,11 +384,15 @@ export default 'SideQuest';
         panel.querySelector('.sq-next').onclick=()=>buildGame(panel);
 
         panel.querySelectorAll('[data-key]').forEach(input=>{
-            input.addEventListener('change',()=>{
+            const key=input.dataset.key;
+            const update=()=>{
                 const s=loadSettings();
-                s[input.dataset.key]=input.checked;
+                s[key]=input.type==='checkbox' ? input.checked : input.value.trim();
                 saveSettings(s);
-            });
+                applyPanelBackground(panel);
+            };
+            input.addEventListener(input.type==='checkbox' ? 'change' : 'input',update);
+            input.addEventListener('change',update);
         });
 
         makeDraggable(panel,panel.querySelector('.sq-head'));
@@ -392,7 +435,7 @@ export default 'SideQuest';
         orb.setAttribute('role','button');
         orb.setAttribute('aria-label','打开 SideQuest');
         orb.title='打开 SideQuest';
-        orb.textContent='📝';
+        orb.textContent='⭐';
         orb.style.cssText = [
             'position:absolute !important',
             'left:0 !important',
@@ -406,12 +449,13 @@ export default 'SideQuest';
             'display:flex',
             'align-items:center',
             'justify-content:center',
-            'border:1px solid var(--SmartThemeBorderColor,rgba(255,255,255,.25))',
-            'border-radius:10px',
-            'background:var(--SmartThemeBlurTintColor,rgba(40,40,45,.96))',
-            'color:var(--SmartThemeBodyColor,#fff)',
-            'box-shadow:0 8px 28px rgba(0,0,0,.38)',
-            'font-size:25px',
+            'border:0',
+            'border-radius:999px',
+            'background:transparent',
+            'color:#fff',
+            'text-shadow:0 2px 12px rgba(0,0,0,.55)',
+            'box-shadow:none',
+            'font-size:34px',
             'line-height:1',
             'cursor:pointer',
             'pointer-events:auto !important',
@@ -563,14 +607,22 @@ export default 'SideQuest';
             <div class="inline-drawer-content">
                 <label class="checkbox_label"><input type="checkbox" data-sq="enabled"><span>启用 SideQuest 悬浮窗</span></label>
                 <hr>
-                <div><b>题目素材</b></div>
-                <label class="checkbox_label"><input type="checkbox" data-sq="includeUser"><span>使用我的对白</span></label>
-                <label class="checkbox_label"><input type="checkbox" data-sq="includeNarration"><span>使用旁白</span></label>
-                <hr>
-                <div><b>悬浮窗里的小游戏</b></div>
-                <label class="checkbox_label"><input type="checkbox" data-sq="whoSaidIt"><span>Who Said It?</span></label>
-                <label class="checkbox_label"><input type="checkbox" data-sq="wordHunt"><span>Word Hunt</span></label>
-                <div class="sq-note">这里只是选择“哪些游戏允许出现”。悬浮窗每次只抽一个玩法。</div>
+                <details class="sq-details">
+                    <summary>题目素材</summary>
+                    <div class="sq-details-body">
+                        <label class="checkbox_label"><input type="checkbox" data-sq="includeUser"><span>我的对白</span></label>
+                        <label class="checkbox_label"><input type="checkbox" data-sq="includeCharacter"><span>角色对白</span></label>
+                        <label class="checkbox_label"><input type="checkbox" data-sq="includeNarration"><span>旁白</span></label>
+                    </div>
+                </details>
+                <details class="sq-details">
+                    <summary>背景</summary>
+                    <div class="sq-details-body">
+                        <label class="sq-setting-label">背景图片 URL</label>
+                        <input class="sq-url-input" type="url" data-sq="backgroundUrl" placeholder="粘贴图片 URL">
+                        <div class="sq-note">留空就是默认玻璃面板。</div>
+                    </div>
+                </details>
             </div>`;
         container.appendChild(drawer);
 
@@ -578,19 +630,23 @@ export default 'SideQuest';
         if (context?.extensionSettings?.sidequest) Object.assign(current,context.extensionSettings.sidequest);
         drawer.querySelectorAll('[data-sq]').forEach(input=>{
             const key=input.dataset.sq;
-            input.checked=!!current[key];
-            input.addEventListener('change',()=>{
-                current[key]=input.checked;
+            if (input.type==='checkbox') input.checked=!!current[key];
+            else input.value=String(current[key]||'');
+            const update=()=>{
+                current[key]=input.type==='checkbox' ? input.checked : input.value.trim();
                 saveSettings(current);
                 if (context?.extensionSettings?.sidequest) {
-                    context.extensionSettings.sidequest[key]=input.checked;
+                    context.extensionSettings.sidequest[key]=current[key];
                     context.saveSettingsDebounced?.();
                 }
+                applyPanelBackground(document.getElementById(PANEL_ID));
                 if (key==='enabled') {
                     document.getElementById(FAB_ID)?.toggleAttribute('hidden',!current.enabled);
                     if (!current.enabled) document.getElementById(PANEL_ID)?.classList.add('sq-hidden');
                 }
-            });
+            };
+            input.addEventListener(input.type==='checkbox' ? 'change' : 'input',update);
+            input.addEventListener('change',update);
         });
     }
 
