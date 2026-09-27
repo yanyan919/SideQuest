@@ -216,40 +216,17 @@ export default 'SideQuest';
         const card=root.querySelector('.sq-card');
         const status=root.querySelector('.sq-status');
         const s=loadSettings();
-        const games=[];
-        if (s.whoSaidIt) games.push('who');
-        if (s.wordHunt) games.push('word');
-
-        if (!games.length) {
-            empty.hidden=false; card.hidden=true;
-            status.textContent='先在设置里打开至少一个小游戏。';
-            return;
-        }
+        // Game selection will live in the window, not in settings.
+        // Until the first new game is added, keep the empty state visible.
         if (!list.length) {
             empty.hidden=false; card.hidden=true;
             status.textContent='还没有找到可出题的剧情内容。';
             return;
         }
 
-        let type=games[Math.floor(Math.random()*games.length)];
-        if (type==='who') {
-            const names=[...new Set(list.map(x=>x.speaker))];
-            if (names.length<2) type='word';
-        }
-
-        if (type==='who') {
-            const target=list[Math.floor(Math.random()*list.length)];
-            const names=[...new Set(list.map(x=>x.speaker))];
-            const choices=[target.speaker,...names.filter(n=>n!==target.speaker).sort(()=>Math.random()-.5)].slice(0,3);
-            if (choices.length<2) return buildWord(root,list);
-            root.querySelector('.sq-label').textContent='WHO SAID IT?';
-            root.querySelector('.sq-prompt').textContent='“'+target.line+'”';
-            renderChoices(root,choices,target.speaker,'答对啦！','不是这个，是 '+target.speaker+'。');
-        } else {
-            buildWord(root,list);
-        }
-        empty.hidden=true; card.hidden=false;
-        status.textContent='小任务准备好了。';
+        empty.hidden=false;
+        card.hidden=true;
+        status.textContent='素材已经准备好了，下一步就在这里挑小游戏。';
     }
 
     function buildWord(root,listArg) {
@@ -511,13 +488,28 @@ export default 'SideQuest';
 
         let tapTimer=null;
         const openPanel=()=>{
+            // Show the window first. Do not let a game-building error leave the
+            // launcher hidden with an invisible window.
             panel.classList.remove('sq-hidden');
+            panel.hidden=false;
             panel.style.setProperty('display','flex','important');
             panel.style.setProperty('position','fixed','important');
-            panel.style.setProperty('z-index','2147483646','important');
+            panel.style.setProperty('z-index','2147483647','important');
+            panel.style.setProperty('visibility','visible','important');
+            panel.style.setProperty('opacity','1','important');
+
             const fabRoot=document.getElementById('sidequest-root-v9');
             if (fabRoot) fabRoot.style.setProperty('display','none','important');
-            buildGame(panel);
+
+            try {
+                buildGame(panel);
+            } catch(error) {
+                console.error('[SideQuest] buildGame failed',error);
+                panel.querySelector('.sq-empty').hidden=false;
+                panel.querySelector('.sq-card').hidden=true;
+                panel.querySelector('.sq-settings').hidden=true;
+                panel.querySelector('.sq-status').textContent='窗口已打开，但这套 ST 的聊天数据暂时无法读取。';
+            }
         };
         const closeTapTimer=()=>{
             if(tapTimer!==null) {
