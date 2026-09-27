@@ -504,7 +504,8 @@ export default 'SideQuest';
             panel.style.setProperty('opacity','1','important');
 
             const fabRoot=document.getElementById('sidequest-root-v9');
-            if (fabRoot) fabRoot.style.setProperty('display','none','important');
+            if (fabRoot) fabRoot.style.setProperty('display','block','important');
+            if (fabOrb) fabOrb.style.setProperty('display','none','important');
 
             try {
                 buildGame(panel);
