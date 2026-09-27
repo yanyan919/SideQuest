@@ -375,3 +375,24 @@
         border-radius: 22px;
     }
 }
+
+.sidequest-new-button {
+    width: 100%;
+    margin-top: 12px;
+    padding: 9px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.055);
+    color: inherit;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.sidequest-new-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.sidequest-card-prompt {
+    white-space: pre-wrap;
+}
