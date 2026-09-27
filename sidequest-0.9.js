@@ -309,6 +309,8 @@ export default 'SideQuest';
         const settingsView=panel.querySelector('.sq-settings');
         const mainView=panel.querySelector('.sq-body');
         const showSettings=()=>{
+            const fabRoot=document.getElementById('sidequest-root-v9');
+            if (fabRoot) fabRoot.style.setProperty('display','none','important');
             panel.querySelector('.sq-empty').hidden=true;
             panel.querySelector('.sq-card').hidden=true;
             panel.querySelector('.sq-settings').hidden=false;
@@ -324,6 +326,8 @@ export default 'SideQuest';
         const closePanel=()=>{
             panel.classList.add('sq-hidden');
             panel.style.setProperty('display','none','important');
+            const fabRoot=document.getElementById('sidequest-root-v9');
+            if (fabRoot) fabRoot.style.setProperty('display','block','important');
         };
         const closeButton=panel.querySelector('[data-act="close"]');
         closeButton.addEventListener('pointerup',e=>{
@@ -460,6 +464,8 @@ export default 'SideQuest';
             panel.style.setProperty('display','flex','important');
             panel.style.setProperty('position','fixed','important');
             panel.style.setProperty('z-index','2147483646','important');
+            const fabRoot=document.getElementById('sidequest-root-v9');
+            if (fabRoot) fabRoot.style.setProperty('display','none','important');
             buildGame(panel);
         };
         const closeTapTimer=()=>{
