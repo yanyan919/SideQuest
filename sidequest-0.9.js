@@ -493,6 +493,13 @@ export default 'SideQuest';
 
         let tapTimer=null;
         const openPanel=()=>{
+            // Re-portal the window at click time. Some self-hosted ST mobile
+            // layouts can move/repaint extension DOM differently after boot.
+            // Keep the launcher root alive, but place the actual window directly
+            // under <body> when it opens so it gets a fresh top-level paint.
+            try {
+                if (!document.body.contains(panel)) document.body.appendChild(panel);
+            } catch {}
             // Show the window first. Do not let a game-building error leave the
             // launcher hidden with an invisible window.
             panel.classList.remove('sq-hidden');
