@@ -1,522 +1,321 @@
 (() => {
     'use strict';
 
-// SideQuest — tiny games between stories.
-// A lightweight SillyTavern UI extension: floating notebook -> draggable game panel.
+    const VERSION = '0.3.0';
+    const ROOT_ID = 'sidequest-root';
+    const FAB_ID = 'sidequest-fab';
+    const PANEL_ID = 'sidequest-panel';
+    const SETTINGS_KEY = 'sidequest_settings_v3';
 
-const STORAGE_KEY = 'sidequest_settings_v2';
-const DEFAULTS = {
-    autoListen: true,
-    includeUser: true,
-    includeNarration: false,
-    whoSaidIt: true,
-    wordHunt: true,
-};
-
-let initialized = false;
-let root = null;
-let panelMoved = false;
-
-function getContext() {
-    try {
-        return globalThis.SillyTavern?.getContext?.() ?? null;
-    } catch (error) {
-        console.error('[SideQuest] getContext failed:', error);
-        return null;
-    }
-}
-
-function loadSettings() {
-    try {
-        return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') };
-    } catch {
-        return { ...DEFAULTS };
-    }
-}
-
-function saveSettings(settings) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
-function cleanText(text) {
-    return String(text ?? '')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function displayName(message) {
-    if (!message) return 'Unknown';
-    if (message.is_user) return 'You';
-    if (message.is_system) return 'System';
-    return String(message.name || message.ch_name || 'Character').trim() || 'Character';
-}
-
-function messageRole(message) {
-    if (message?.is_system) return 'system';
-    if (message?.is_user) return 'user';
-    return 'character';
-}
-
-function unique(values) {
-    return [...new Set(values.filter(Boolean))];
-}
-
-function shuffle(values) {
-    const copy = [...values];
-    for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
-}
-
-function getRecentMessages(limit = 30) {
-    const ctx = getContext();
-    const chat = ctx?.chat;
-    if (!Array.isArray(chat)) return [];
-    return chat
-        .map((message, index) => ({ message, index }))
-        .filter(({ message }) => message && !message.is_system && message.mes)
-        .slice(-limit);
-}
-
-function extractDialogue(message, settings) {
-    const text = cleanText(message.mes);
-    const fallbackSpeaker = displayName(message);
-    const lines = [];
-    let match;
-
-    // Character: "..."
-    const labeled = /(?:^|\s)([^:\n]{1,50})\s*[:：]\s*[“"「『]([^”"」』\n]{8,220})[”"」』]/g;
-    while ((match = labeled.exec(text)) !== null) {
-        const candidate = match[1].trim();
-        if (candidate && !/^[\W_]+$/u.test(candidate)) {
-            lines.push({ speaker: candidate, line: match[2].trim(), kind: 'dialogue' });
-        }
-    }
-    if (lines.length) return lines;
-
-    // "..."
-    const quoted = /[“"]([^“”"]{8,220})[”"]/g;
-    while ((match = quoted.exec(text)) !== null) {
-        lines.push({ speaker: fallbackSpeaker, line: match[1].trim(), kind: 'dialogue' });
-    }
-    if (lines.length) return lines;
-
-    // Optional narration source.
-    if (settings.includeNarration) {
-        const plain = text.replace(/^[*~_\-—]+|[*~_\-—]+$/g, '').trim();
-        if (plain.length >= 12 && plain.length <= 220) {
-            return [{ speaker: fallbackSpeaker, line: plain, kind: 'narration' }];
-        }
-    }
-
-    return [];
-}
-
-function getSources(settings) {
-    const messages = getRecentMessages();
-    const out = [];
-
-    for (const { message, index } of messages) {
-        const role = messageRole(message);
-        if (role === 'user' && !settings.includeUser) continue;
-
-        for (const item of extractDialogue(message, settings)) {
-            out.push({ ...item, role, messageIndex: index });
-        }
-    }
-    return { messages, sources: out };
-}
-
-function clamp(element, left, top) {
-    const r = element.getBoundingClientRect();
-    return {
-        left: Math.max(6, Math.min(left, innerWidth - r.width - 6)),
-        top: Math.max(6, Math.min(top, innerHeight - r.height - 6)),
-    };
-}
-
-function makeDraggable(element, handle, { allowButtons = false, onDragged } = {}) {
-    let dragging = false;
-    let moved = false;
-    let pointerId = null;
-    let startX = 0;
-    let startY = 0;
-    let originLeft = 0;
-    let originTop = 0;
-
-    handle.addEventListener('pointerdown', event => {
-        if (event.button !== undefined && event.button !== 0) return;
-        if (!allowButtons && event.target.closest('button')) return;
-
-        const r = element.getBoundingClientRect();
-        pointerId = event.pointerId;
-        startX = event.clientX;
-        startY = event.clientY;
-        originLeft = r.left;
-        originTop = r.top;
-        dragging = true;
-        moved = false;
-
-        handle.setPointerCapture?.(pointerId);
-        element.classList.add('sidequest-dragging');
-        event.preventDefault();
-    });
-
-    handle.addEventListener('pointermove', event => {
-        if (!dragging || event.pointerId !== pointerId) return;
-
-        const dx = event.clientX - startX;
-        const dy = event.clientY - startY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
-
-        const next = clamp(element, originLeft + dx, originTop + dy);
-        element.style.left = `${next.left}px`;
-        element.style.top = `${next.top}px`;
-        element.style.right = 'auto';
-        element.style.bottom = 'auto';
-
-        if (moved) onDragged?.();
-    });
-
-    const stop = event => {
-        if (!dragging || (event.pointerId !== undefined && event.pointerId !== pointerId)) return;
-        dragging = false;
-        handle.releasePointerCapture?.(pointerId);
-        pointerId = null;
-        element.classList.remove('sidequest-dragging');
+    const DEFAULTS = {
+        includeUser: true,
+        includeNarration: false,
+        whoSaidIt: true,
+        wordHunt: true,
     };
 
-    handle.addEventListener('pointerup', stop);
-    handle.addEventListener('pointercancel', stop);
+    let root;
+    let fab;
+    let panel;
+    let dragged = false;
 
-    return () => {
-        const result = moved;
-        moved = false;
-        return result;
-    };
-}
-
-function initSideQuest() {
-    if (initialized || !document.body) return;
-    initialized = true;
-
-    const settings = loadSettings();
-
-    root = document.createElement('section');
-    root.id = 'sidequest-root';
-    root.innerHTML = `
-        <button id="sidequest-fab" type="button" aria-label="Open SideQuest" title="SideQuest">
-            <span class="sidequest-fab-icon">📝</span>
-        </button>
-
-        <div id="sidequest-panel" class="sidequest-hidden" aria-hidden="true">
-            <div class="sidequest-panel-header">
-                <div class="sidequest-drag-handle" title="Drag to move">
-                    <div class="sidequest-title">SideQuest</div>
-                    <div class="sidequest-subtitle">Tiny games between stories</div>
-                </div>
-                <div class="sidequest-header-actions">
-                    <button id="sidequest-settings-button" class="sidequest-icon-button" type="button" title="Settings">⚙</button>
-                    <button id="sidequest-close" class="sidequest-icon-button" type="button" title="Close">×</button>
-                </div>
-            </div>
-
-            <div class="sidequest-panel-body">
-                <div class="sidequest-status" id="sidequest-status">
-                    <span class="sidequest-status-dot"></span><span>Watching your story...</span>
-                </div>
-
-                <div id="sidequest-main-view">
-                    <div class="sidequest-empty-state" id="sidequest-empty-state">
-                        <div class="sidequest-empty-icon">✨</div>
-                        <div class="sidequest-empty-title">Your little side quest</div>
-                        <div class="sidequest-empty-text">
-                            SideQuest turns recent RP lines into tiny games while you wait for the next scene.
-                        </div>
-                    </div>
-
-                    <div class="sidequest-game-card" id="sidequest-game-card" hidden>
-                        <div class="sidequest-card-label" id="sidequest-card-label">WHO SAID IT?</div>
-                        <div class="sidequest-card-prompt" id="sidequest-prompt"></div>
-                        <div class="sidequest-options" id="sidequest-options"></div>
-                        <div class="sidequest-feedback" id="sidequest-feedback" aria-live="polite"></div>
-                        <button id="sidequest-new-quest" class="sidequest-new-button" type="button">↻ New quest</button>
-                    </div>
-
-                    <div class="sidequest-source" id="sidequest-source" hidden></div>
-                </div>
-
-                <div class="sidequest-settings-view" id="sidequest-settings-view" hidden>
-                    <div class="sidequest-settings-title">SideQuest settings</div>
-                    <div class="sidequest-settings-note">
-                        Pick what can become a game. Changes save automatically.
-                    </div>
-
-                    <label class="sidequest-setting-row">
-                        <span><strong>Auto-listen</strong><small>Refresh after new RP messages.</small></span>
-                        <input id="sq-setting-auto" type="checkbox">
-                    </label>
-                    <label class="sidequest-setting-row">
-                        <span><strong>My messages</strong><small>Allow your own dialogue as source text.</small></span>
-                        <input id="sq-setting-user" type="checkbox">
-                    </label>
-                    <label class="sidequest-setting-row">
-                        <span><strong>Narration</strong><small>Allow narration to become source text.</small></span>
-                        <input id="sq-setting-narration" type="checkbox">
-                    </label>
-                    <label class="sidequest-setting-row">
-                        <span><strong>Who said it?</strong><small>Guess the speaker from recent RP.</small></span>
-                        <input id="sq-setting-who" type="checkbox">
-                    </label>
-                    <label class="sidequest-setting-row">
-                        <span><strong>Word hunt</strong><small>Pick a word from a recent sentence.</small></span>
-                        <input id="sq-setting-word" type="checkbox">
-                    </label>
-
-                    <button id="sidequest-back" class="sidequest-back-button" type="button">← Back to quests</button>
-                </div>
-            </div>
-
-            <div class="sidequest-panel-footer">
-                <span>SideQuest 0.2.0</span><span>Fun first.</span>
-            </div>
-        </div>`;
-
-    document.body.appendChild(root);
-
-    const fab = root.querySelector('#sidequest-fab');
-    const panel = root.querySelector('#sidequest-panel');
-    const dragHandle = root.querySelector('.sidequest-drag-handle');
-    const close = root.querySelector('#sidequest-close');
-    const settingsButton = root.querySelector('#sidequest-settings-button');
-    const backButton = root.querySelector('#sidequest-back');
-    const status = root.querySelector('#sidequest-status');
-    const emptyState = root.querySelector('#sidequest-empty-state');
-    const gameCard = root.querySelector('#sidequest-game-card');
-    const cardLabel = root.querySelector('#sidequest-card-label');
-    const prompt = root.querySelector('#sidequest-prompt');
-    const options = root.querySelector('#sidequest-options');
-    const feedback = root.querySelector('#sidequest-feedback');
-    const source = root.querySelector('#sidequest-source');
-    const settingsView = root.querySelector('#sidequest-settings-view');
-    const newQuest = root.querySelector('#sidequest-new-quest');
-
-    const inputs = {
-        autoListen: root.querySelector('#sq-setting-auto'),
-        includeUser: root.querySelector('#sq-setting-user'),
-        includeNarration: root.querySelector('#sq-setting-narration'),
-        whoSaidIt: root.querySelector('#sq-setting-who'),
-        wordHunt: root.querySelector('#sq-setting-word'),
-    };
-
-    for (const [key, input] of Object.entries(inputs)) input.checked = settings[key];
-
-    function setOpen(open) {
-        panel.classList.toggle('sidequest-hidden', !open);
-        panel.setAttribute('aria-hidden', String(!open));
-        fab.setAttribute('aria-expanded', String(open));
-
-        if (open && !panelMoved) {
-            const f = fab.getBoundingClientRect();
-            const p = panel.getBoundingClientRect();
-            const left = Math.max(8, Math.min(f.right - p.width, innerWidth - p.width - 8));
-            const top = Math.max(8, Math.min(f.top - 14 - p.height, innerHeight - p.height - 8));
-            panel.style.left = `${left}px`;
-            panel.style.top = `${top}px`;
-            panel.style.right = 'auto';
-            panel.style.bottom = 'auto';
+    function settings() {
+        try {
+            return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
+        } catch {
+            return { ...DEFAULTS };
         }
     }
 
-    const fabWasDragged = makeDraggable(fab, fab, { allowButtons: true });
-    fab.addEventListener('click', event => {
-        if (fabWasDragged()) {
-            event.preventDefault();
-            return;
-        }
-        setOpen(panel.classList.contains('sidequest-hidden'));
-    });
-
-    makeDraggable(panel, dragHandle, {
-        onDragged: () => { panelMoved = true; },
-    });
-
-    close.addEventListener('click', () => setOpen(false));
-
-    function showSettings(show) {
-        settingsView.hidden = !show;
-        root.querySelector('#sidequest-main-view').hidden = show;
-        settingsButton.classList.toggle('sidequest-active', show);
-        if (!show) buildQuest();
+    function saveSettings(value) {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(value)); } catch {}
     }
 
-    settingsButton.addEventListener('click', () => showSettings(settingsView.hidden));
-    backButton.addEventListener('click', () => showSettings(false));
+    function getContext() {
+        try { return globalThis.SillyTavern?.getContext?.() || null; } catch { return null; }
+    }
 
-    for (const [key, input] of Object.entries(inputs)) {
-        input.addEventListener('change', () => {
-            settings[key] = input.checked;
-            saveSettings(settings);
-            if (settingsView.hidden) buildQuest();
+    function clean(text) {
+        return String(text || '')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function recentMessages() {
+        const chat = getContext()?.chat;
+        if (!Array.isArray(chat)) return [];
+        return chat.filter(m => m && !m.is_system && m.mes).slice(-30);
+    }
+
+    function speaker(message) {
+        if (message.is_user) return 'You';
+        return String(message.name || message.ch_name || 'Character').trim() || 'Character';
+    }
+
+    function sources() {
+        const s = settings();
+        const out = [];
+        for (const message of recentMessages()) {
+            if (message.is_user && !s.includeUser) continue;
+            const text = clean(message.mes);
+            let found = false;
+            const quoted = /[“"]([^“”"]{8,220})[”"]/g;
+            let match;
+            while ((match = quoted.exec(text))) {
+                found = true;
+                out.push({ speaker: speaker(message), line: match[1].trim() });
+            }
+            if (!found && s.includeNarration && text.length >= 12 && text.length <= 220) {
+                out.push({ speaker: speaker(message), line: text });
+            }
+        }
+        return out;
+    }
+
+    function makeDraggable(element, handle) {
+        let active = false, pointer = 0, sx = 0, sy = 0, ox = 0, oy = 0;
+        handle.addEventListener('pointerdown', e => {
+            if (e.button !== 0) return;
+            const r = element.getBoundingClientRect();
+            active = true; pointer = e.pointerId;
+            sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; dragged = false;
+            handle.setPointerCapture?.(pointer);
+            e.preventDefault();
         });
-    }
-
-    function setStatus(text, active = false) {
-        status.querySelector('span:last-child').textContent = text;
-        status.classList.toggle('sidequest-status-active', active);
-    }
-
-    function finishChoice(correct, answer, chosenButton) {
-        [...options.querySelectorAll('button')].forEach(button => {
-            button.disabled = true;
-            if (button.dataset.answer === answer) button.classList.add('sidequest-correct');
+        handle.addEventListener('pointermove', e => {
+            if (!active || e.pointerId !== pointer) return;
+            const dx = e.clientX - sx, dy = e.clientY - sy;
+            if (Math.abs(dx) + Math.abs(dy) > 4) dragged = true;
+            const r = element.getBoundingClientRect();
+            const left = Math.max(6, Math.min(ox + dx, innerWidth - r.width - 6));
+            const top = Math.max(6, Math.min(oy + dy, innerHeight - r.height - 6));
+            element.style.left = left + 'px';
+            element.style.top = top + 'px';
+            element.style.right = 'auto';
+            element.style.bottom = 'auto';
         });
-
-        if (correct) {
-            chosenButton.classList.add('sidequest-correct');
-            feedback.textContent = '✨ Nice. Your RP memory is getting dangerous.';
-            feedback.className = 'sidequest-feedback sidequest-feedback-good';
-        } else {
-            chosenButton.classList.add('sidequest-wrong');
-            feedback.textContent = `Not quite — it was ${answer}.`;
-            feedback.className = 'sidequest-feedback sidequest-feedback-bad';
-        }
+        const stop = e => {
+            if (!active || e.pointerId !== pointer) return;
+            active = false;
+            handle.releasePointerCapture?.(pointer);
+        };
+        handle.addEventListener('pointerup', stop);
+        handle.addEventListener('pointercancel', stop);
     }
 
-    function buildWhoSaidIt(sources, participants) {
-        if (!settings.whoSaidIt) return false;
-
-        const dialogue = sources.filter(item => item.kind === 'dialogue');
-        if (!dialogue.length) return false;
-
-        const target = dialogue.slice(-8)[Math.floor(Math.random() * Math.min(8, dialogue.slice(-8).length))];
-        const names = unique([...dialogue.map(item => item.speaker), ...participants]);
-        const answers = [target.speaker, ...shuffle(names.filter(name => name !== target.speaker))].slice(0, 3);
-
-        if (answers.length < 2) return false;
-
-        cardLabel.textContent = 'WHO SAID IT?';
-        prompt.textContent = `“${target.line}”`;
-        options.innerHTML = '';
-        feedback.textContent = '';
-        feedback.className = 'sidequest-feedback';
-
-        for (const name of shuffle(answers)) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'sidequest-option';
-            button.textContent = name;
-            button.dataset.answer = target.speaker;
-            button.addEventListener('click', () => finishChoice(name === target.speaker, target.speaker, button));
-            options.appendChild(button);
-        }
-
-        source.textContent = `From: ${target.speaker}`;
-        return true;
-    }
-
-    function buildWordHunt(sources) {
-        if (!settings.wordHunt || !sources.length) return false;
-
-        const eligible = sources.filter(item => item.line.split(/\s+/).length >= 7);
-        if (!eligible.length) return false;
-
-        const target = eligible[Math.floor(Math.random() * Math.min(8, eligible.length))];
-        const words = target.line.match(/[A-Za-z]{4,}/g) || [];
-        const uniqueWords = unique(words.map(word => word.toLowerCase()));
-
-        if (uniqueWords.length < 3) return false;
-
-        const answer = uniqueWords[Math.floor(Math.random() * uniqueWords.length)];
-        const choices = [answer, ...shuffle(uniqueWords.filter(word => word !== answer))].slice(0, 3);
-
-        cardLabel.textContent = 'WORD HUNT';
-        prompt.innerHTML = `Which word appears in this line?<br><br>“${target.line}”`;
-        options.innerHTML = '';
-        feedback.textContent = '';
-        feedback.className = 'sidequest-feedback';
-
-        for (const word of shuffle(choices)) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'sidequest-option';
-            button.textContent = word;
-            button.dataset.answer = answer;
-            button.addEventListener('click', () => finishChoice(word === answer, answer, button));
-            options.appendChild(button);
-        }
-
-        source.textContent = `A word from ${target.speaker}\'s line`;
-        return true;
+    function showError(error) {
+        if (!root) return;
+        const box = root.querySelector('#sidequest-diagnostic');
+        if (!box) return;
+        box.hidden = false;
+        box.textContent = 'SideQuest启动遇到小问题：' + String(error?.message || error || 'Unknown error');
     }
 
     function buildQuest() {
-        const { messages, sources } = getSources(settings);
+        const list = sources();
+        const empty = root.querySelector('#sidequest-empty');
+        const card = root.querySelector('#sidequest-card');
+        const prompt = root.querySelector('#sidequest-prompt');
+        const options = root.querySelector('#sidequest-options');
+        const feedback = root.querySelector('#sidequest-feedback');
+        const status = root.querySelector('#sidequest-status');
 
-        if (!sources.length) {
-            setStatus('Waiting for a story...');
-            emptyState.hidden = false;
-            gameCard.hidden = true;
-            source.hidden = true;
+        if (!list.length) {
+            empty.hidden = false; card.hidden = true;
+            status.textContent = '等待新的剧情……';
             return;
         }
 
-        const participants = unique(messages.map(({ message }) => displayName(message)));
+        const s = settings();
+        let type = s.whoSaidIt ? 'who' : 'word';
+        if (s.whoSaidIt && s.wordHunt) type = Math.random() < 0.5 ? 'who' : 'word';
 
-        const built = Math.random() < 0.65
-            ? buildWhoSaidIt(sources, participants) || buildWordHunt(sources)
-            : buildWordHunt(sources) || buildWhoSaidIt(sources, participants);
+        options.innerHTML = '';
+        feedback.textContent = '';
 
-        if (!built) {
-            setStatus('I found the story — give me a little more dialogue.');
-            emptyState.hidden = false;
-            gameCard.hidden = true;
-            source.hidden = true;
-            return;
-        }
+        if (type === 'who') {
+            const target = list[Math.floor(Math.random() * list.length)];
+            const names = [...new Set(list.map(x => x.speaker))];
+            const choices = [target.speaker, ...names.filter(x => x !== target.speaker).sort(() => Math.random() - .5)].slice(0, 3);
+            if (choices.length < 2) return buildWordQuest(list);
 
-        emptyState.hidden = true;
-        gameCard.hidden = false;
-        source.hidden = false;
-        setStatus('A tiny quest is ready.', true);
-    }
-
-    newQuest.addEventListener('click', buildQuest);
-
-    // ST exposes the extension context through this stable global API.
-    const ctx = getContext();
-    const eventSource = ctx?.eventSource;
-    const eventTypes = ctx?.eventTypes ?? ctx?.event_types;
-
-    if (eventSource && eventTypes) {
-        for (const event of unique([
-            eventTypes.MESSAGE_RECEIVED,
-            eventTypes.MESSAGE_UPDATED,
-            eventTypes.MESSAGE_SWIPED,
-            eventTypes.CHAT_CHANGED,
-        ])) {
-            eventSource.on(event, () => {
-                if (settings.autoListen && settingsView.hidden) buildQuest();
+            root.querySelector('#sidequest-label').textContent = 'WHO SAID IT?';
+            prompt.textContent = '“' + target.line + '”';
+            choices.sort(() => Math.random() - .5).forEach(name => {
+                const b = document.createElement('button');
+                b.className = 'sidequest-option';
+                b.type = 'button';
+                b.textContent = name;
+                b.onclick = () => {
+                    [...options.children].forEach(x => x.disabled = true);
+                    const ok = name === target.speaker;
+                    b.classList.add(ok ? 'sidequest-correct' : 'sidequest-wrong');
+                    feedback.textContent = ok ? '✨ 对啦！' : '不是这个，是 ' + target.speaker + '。';
+                };
+                options.appendChild(b);
             });
+        } else {
+            buildWordQuest(list);
+            return;
+        }
+
+        empty.hidden = true; card.hidden = false;
+        status.textContent = '小任务准备好了。';
+    }
+
+    function buildWordQuest(list) {
+        const rootList = list.filter(x => (x.line.match(/[A-Za-z]{4,}/g) || []).length >= 3);
+        if (!rootList.length) {
+            root.querySelector('#sidequest-empty').hidden = false;
+            root.querySelector('#sidequest-card').hidden = true;
+            root.querySelector('#sidequest-status').textContent = '找到剧情了，再来一点英文对白就能玩啦。';
+            return;
+        }
+        const target = rootList[Math.floor(Math.random() * rootList.length)];
+        const words = [...new Set((target.line.match(/[A-Za-z]{4,}/g) || []).map(x => x.toLowerCase()))];
+        const answer = words[Math.floor(Math.random() * words.length)];
+        const choices = [answer, ...words.filter(x => x !== answer).sort(() => Math.random() - .5)].slice(0, 3);
+        const options = root.querySelector('#sidequest-options');
+        const feedback = root.querySelector('#sidequest-feedback');
+        root.querySelector('#sidequest-label').textContent = 'WORD HUNT';
+        root.querySelector('#sidequest-prompt').textContent = '哪个单词藏在这句里？\n\n“' + target.line + '”';
+        options.innerHTML = '';
+        feedback.textContent = '';
+        choices.sort(() => Math.random() - .5).forEach(word => {
+            const b = document.createElement('button');
+            b.className = 'sidequest-option';
+            b.type = 'button';
+            b.textContent = word;
+            b.onclick = () => {
+                [...options.children].forEach(x => x.disabled = true);
+                const ok = word === answer;
+                b.classList.add(ok ? 'sidequest-correct' : 'sidequest-wrong');
+                feedback.textContent = ok ? '✨ 抓到了！' : '答案是 ' + answer + '。';
+            };
+            options.appendChild(b);
+        });
+        root.querySelector('#sidequest-empty').hidden = true;
+        root.querySelector('#sidequest-card').hidden = false;
+        root.querySelector('#sidequest-status').textContent = '小任务准备好了。';
+    }
+
+    function createUI() {
+        if (document.getElementById(ROOT_ID)) return;
+
+        root = document.createElement('section');
+        root.id = ROOT_ID;
+        root.innerHTML = `
+            <button id="sidequest-fab" type="button" aria-label="Open SideQuest">📝</button>
+            <div id="sidequest-panel" class="sidequest-hidden" aria-hidden="true">
+                <div class="sidequest-header">
+                    <div id="sidequest-drag-handle">
+                        <strong>SideQuest</strong>
+                        <small>边等剧情，边偷偷玩一下</small>
+                    </div>
+                    <div>
+                        <button id="sidequest-settings" class="sidequest-mini" type="button">⚙</button>
+                        <button id="sidequest-close" class="sidequest-mini" type="button">×</button>
+                    </div>
+                </div>
+                <div id="sidequest-main">
+                    <div id="sidequest-status">准备中……</div>
+                    <div id="sidequest-empty">
+                        <div>✨</div>
+                        <strong id="sidequest-empty-title">你的小支线</strong>
+                        <p>它会从最近的 RP 里偷偷捡一点英文出来，做成小游戏。</p>
+                    </div>
+                    <div id="sidequest-card" hidden>
+                        <div id="sidequest-label">WORD HUNT</div>
+                        <div id="sidequest-prompt"></div>
+                        <div id="sidequest-options"></div>
+                        <div id="sidequest-feedback"></div>
+                        <button id="sidequest-new" type="button">↻ 再来一个</button>
+                    </div>
+                    <div id="sidequest-diagnostic" hidden></div>
+                </div>
+                <div id="sidequest-settings-view" hidden>
+                    <strong>游戏设置</strong>
+                    <p>勾选你想玩的内容。以后哥哥可以继续往这里塞新游戏。</p>
+                    <label><input id="sq-user" type="checkbox"> 我的对白也可以出题</label>
+                    <label><input id="sq-narration" type="checkbox"> 旁白也可以出题</label>
+                    <label><input id="sq-who" type="checkbox"> Who said it?</label>
+                    <label><input id="sq-word" type="checkbox"> Word hunt</label>
+                    <button id="sidequest-back" type="button">← 回去玩</button>
+                </div>
+            </div>`;
+        document.body.appendChild(root);
+
+        fab = root.querySelector('#sidequest-fab');
+        panel = root.querySelector('#sidequest-panel');
+
+        makeDraggable(fab, fab);
+        makeDraggable(panel, root.querySelector('#sidequest-drag-handle'));
+
+        fab.onclick = () => {
+            if (dragged) { dragged = false; return; }
+            const open = panel.classList.contains('sidequest-hidden');
+            panel.classList.toggle('sidequest-hidden', !open);
+            panel.setAttribute('aria-hidden', String(!open));
+            if (open) buildQuest();
+        };
+
+        root.querySelector('#sidequest-close').onclick = () => {
+            panel.classList.add('sidequest-hidden');
+            panel.setAttribute('aria-hidden', 'true');
+        };
+
+        root.querySelector('#sidequest-new').onclick = () => {
+            try { buildQuest(); } catch (e) { showError(e); }
+        };
+
+        const cfg = settings();
+        const inputs = {
+            includeUser: root.querySelector('#sq-user'),
+            includeNarration: root.querySelector('#sq-narration'),
+            whoSaidIt: root.querySelector('#sq-who'),
+            wordHunt: root.querySelector('#sq-word'),
+        };
+        Object.entries(inputs).forEach(([key, input]) => {
+            input.checked = cfg[key];
+            input.onchange = () => { cfg[key] = input.checked; saveSettings(cfg); };
+        });
+
+        root.querySelector('#sidequest-settings').onclick = () => {
+            root.querySelector('#sidequest-main').hidden = true;
+            root.querySelector('#sidequest-settings-view').hidden = false;
+        };
+        root.querySelector('#sidequest-back').onclick = () => {
+            root.querySelector('#sidequest-settings-view').hidden = true;
+            root.querySelector('#sidequest-main').hidden = false;
+            try { buildQuest(); } catch (e) { showError(e); }
+        };
+
+        // The UI is deliberately independent of SillyTavern APIs.
+        // Chat-reading is an optional second layer.
+        try { buildQuest(); } catch (e) { showError(e); }
+
+        console.log('[SideQuest ' + VERSION + '] UI ready');
+    }
+
+    function boot() {
+        try {
+            createUI();
+        } catch (error) {
+            console.error('[SideQuest] UI boot failed:', error);
+            try {
+                const notice = document.createElement('div');
+                notice.textContent = 'SideQuest 加载失败：' + String(error?.message || error);
+                notice.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:2147483647;background:#8b1e1e;color:#fff;padding:10px 12px;border-radius:10px;font:12px sans-serif;';
+                document.body?.appendChild(notice);
+            } catch {}
         }
     }
 
-    buildQuest();
-    console.log('[SideQuest] ready');
-}
-
-
-    try {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initSideQuest, { once: true });
-        } else {
-            initSideQuest();
-        }
-    } catch (error) {
-        console.error('[SideQuest] startup failed:', error);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot, { once: true });
+    } else {
+        boot();
     }
 })();
