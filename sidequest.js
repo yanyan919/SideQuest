@@ -133,9 +133,9 @@ export default 'SideQuest';
 
     function clean(value) {
         return String(value || '')
-            .replace(/<br\s*\\/?\s*>/gi, '\\n')
+            .replace(/<br\s*\/?\s*>/gi, '\n')
             .replace(/<[^>]*>/g, ' ')
-            .replace(/\\s+/g, ' ')
+            .replace(/\s+/g, ' ')
             .trim();
     }
 
