@@ -396,3 +396,11 @@
 .sidequest-card-prompt {
     white-space: pre-wrap;
 }
+
+#sidequest-root { position: static !important; font-family: inherit; }
+#sidequest-panel { z-index: 2147483645 !important; }
+#sidequest-diagnostic { margin-top:12px; padding:10px; border-radius:10px; background:rgba(180,40,40,.18); color:#ffb0b0; font-size:11px; white-space:pre-wrap; }
+#sidequest-main p { opacity:.6; line-height:1.5; font-size:12px; }
+#sidequest-settings-view { padding:18px; }
+#sidequest-settings-view label { display:block; padding:10px 0; font-size:12px; }
+#sidequest-settings-view button { margin-top:12px; width:100%; padding:10px; }
