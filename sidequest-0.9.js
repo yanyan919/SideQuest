@@ -163,7 +163,7 @@ export default 'SideQuest';
     function addStyle() {
         if (document.getElementById('sidequest-style-v9')) return;
         const style = document.createElement('style');
-        style.id = 'sidequest-style-v4';
+        style.id = 'sidequest-style-v9';
         style.textContent = css;
         document.head?.appendChild(style);
     }
@@ -437,39 +437,53 @@ export default 'SideQuest';
             root.dataset.dragged=moved?'1':'0';
         };
 
+        let tapTimer=null;
+        const openPanel=()=>{
+            panel.classList.remove('sq-hidden');
+            panel.style.setProperty('display','flex','important');
+            panel.style.setProperty('position','fixed','important');
+            panel.style.setProperty('z-index','2147483646','important');
+            buildGame(panel);
+        };
+        const closeTapTimer=()=>{
+            if(tapTimer!==null) {
+                clearTimeout(tapTimer);
+                tapTimer=null;
+            }
+        };
         orb.addEventListener('pointerdown',e=>{
             if(e.pointerType==='mouse' && e.button!==0) return;
+            closeTapTimer();
             start(e.clientX,e.clientY);
             orb.setPointerCapture?.(e.pointerId);
-            e.preventDefault();
+            // Do not call preventDefault here. The orb already has touch-action:none,
+            // and keeping the native pointer sequence intact makes tapping reliable.
             e.stopPropagation();
+            tapTimer=setTimeout(()=>{
+                if(dragging && !moved) openPanel();
+            },220);
         });
         orb.addEventListener('pointermove',e=>{
+            if(dragging && Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy)>5) {
+                closeTapTimer();
+            }
             move(e.clientX,e.clientY);
             if(dragging) { e.preventDefault(); e.stopPropagation(); }
         });
-        // On iPhone/Safari, preventDefault() + pointer capture can suppress the
-        // synthetic click event. Therefore a tap opens the panel directly on pointerup.
-        // A real drag never opens it.
-        const openPanelIfTap=()=>{
-            if(root.dataset.dragged==='1') {
-                root.dataset.dragged='0';
-                return;
-            }
-            const hidden=panel.classList.contains('sq-hidden');
-            panel.classList.toggle('sq-hidden',!hidden);
-            if(hidden) buildGame(panel);
-        };
         orb.addEventListener('pointerup',e=>{
             const wasDragged=moved;
+            closeTapTimer();
             finish();
-            if(!wasDragged) openPanelIfTap();
+            if(!wasDragged) openPanel();
             e.stopPropagation();
         });
-        orb.addEventListener('pointercancel',finish);
+        orb.addEventListener('pointercancel',()=>{
+            closeTapTimer();
+            finish();
+        });
         orb.addEventListener('click',e=>{
-            // Keep desktop mouse clicks working, but avoid double-opening after
-            // the pointerup handler above.
+            // Pointerup already handles the tap. Stop the follow-up click so
+            // one tap cannot toggle the window twice.
             e.preventDefault();
             e.stopPropagation();
         });
