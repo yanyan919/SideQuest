@@ -52,7 +52,7 @@ export default 'SideQuest';
             box-sizing: border-box;
             border: 1px solid rgba(255,255,255,.16);
             border-radius: 22px;
-            background: rgba(27,27,33,.985);
+            background: rgba(27,27,33,.62);
             color: var(--SmartThemeBodyColor, #f2f2f2) !important;
             box-shadow: 0 22px 70px rgba(0,0,0,.45);
             backdrop-filter: blur(18px);
@@ -154,17 +154,24 @@ export default 'SideQuest';
         const s = loadSettings();
         const result = [];
         for (const message of chatMessages()) {
-            if (message.is_user && !s.includeUser) continue;
-            if (!message.is_user && !s.includeCharacter) continue;
             const text = clean(message.mes);
             const speaker = message.is_user ? 'You' : (String(message.name || message.ch_name || 'Character').trim() || 'Character');
+            if (!text) continue;
+
+            if (message.is_user) {
+                if (!s.includeUser) continue;
+                if (text.length >= 8 && text.length <= 260) result.push({ speaker, line: text });
+                continue;
+            }
+
             let foundQuote = false;
             const re = /[“"]([^“”"]{8,240})[”"]/g;
             let match;
             while ((match = re.exec(text))) {
                 foundQuote = true;
-                result.push({ speaker, line: match[1].trim() });
+                if (s.includeCharacter) result.push({ speaker, line: match[1].trim() });
             }
+
             if (!foundQuote && s.includeNarration && text.length >= 12 && text.length <= 260) {
                 result.push({ speaker, line: text });
             }
