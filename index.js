@@ -1,3 +1,6 @@
+(() => {
+    'use strict';
+
 // SideQuest — tiny games between stories.
 // A lightweight SillyTavern UI extension: floating notebook -> draggable game panel.
 
@@ -506,18 +509,14 @@ function initSideQuest() {
     console.log('[SideQuest] ready');
 }
 
-function start() {
-    try {
-        initSideQuest();
-    } catch (error) {
-        initialized = false;
-        console.error('[SideQuest] failed to initialize:', error);
-        if (globalThis.toastr) toastr.error('SideQuest failed to start. Check the browser console for details.', 'SideQuest');
-    }
-}
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-} else {
-    start();
-}
+    try {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSideQuest, { once: true });
+        } else {
+            initSideQuest();
+        }
+    } catch (error) {
+        console.error('[SideQuest] startup failed:', error);
+    }
+})();
