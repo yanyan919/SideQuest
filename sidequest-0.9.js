@@ -342,7 +342,7 @@ export default 'SideQuest';
         // Follow the proven ST floating-extension pattern:
         // one fixed root <div>, with a non-button orb inside it.
         const root = document.createElement('div');
-        root.id = 'sidequest-root-v5';
+        root.id = 'sidequest-root-v9';
         root.style.cssText = [
             'position:fixed !important',
             'left:0px !important',
@@ -448,12 +448,10 @@ export default 'SideQuest';
             move(e.clientX,e.clientY);
             if(dragging) { e.preventDefault(); e.stopPropagation(); }
         });
-        orb.addEventListener('pointerup',e=>{
-            finish();
-            e.stopPropagation();
-        });
-        orb.addEventListener('pointercancel',finish);
-        orb.addEventListener('click',()=>{
+        // On iPhone/Safari, preventDefault() + pointer capture can suppress the
+        // synthetic click event. Therefore a tap opens the panel directly on pointerup.
+        // A real drag never opens it.
+        const openPanelIfTap=()=>{
             if(root.dataset.dragged==='1') {
                 root.dataset.dragged='0';
                 return;
@@ -461,6 +459,19 @@ export default 'SideQuest';
             const hidden=panel.classList.contains('sq-hidden');
             panel.classList.toggle('sq-hidden',!hidden);
             if(hidden) buildGame(panel);
+        };
+        orb.addEventListener('pointerup',e=>{
+            const wasDragged=moved;
+            finish();
+            if(!wasDragged) openPanelIfTap();
+            e.stopPropagation();
+        });
+        orb.addEventListener('pointercancel',finish);
+        orb.addEventListener('click',e=>{
+            // Keep desktop mouse clicks working, but avoid double-opening after
+            // the pointerup handler above.
+            e.preventDefault();
+            e.stopPropagation();
         });
 
         // Put the orb in the same safe mobile corner strategy used by
@@ -487,7 +498,7 @@ export default 'SideQuest';
         let panel=document.getElementById(PANEL_ID);
         if (!panel) panel=createPanel();
 
-        const existing=document.getElementById('sidequest-root-v5');
+        const existing=document.getElementById('sidequest-root-v9');
         if (existing) existing.remove();
         createFab(panel);
 
