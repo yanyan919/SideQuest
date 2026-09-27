@@ -53,7 +53,7 @@ export default 'SideQuest';
             border: 1px solid rgba(255,255,255,.16);
             border-radius: 22px;
             background: rgba(27,27,33,.985);
-            color: inherit;
+            color: var(--SmartThemeBodyColor, #f2f2f2) !important;
             box-shadow: 0 22px 70px rgba(0,0,0,.45);
             backdrop-filter: blur(18px);
         }
@@ -69,7 +69,10 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-actions { display:flex; gap:5px; }
         #${PANEL_ID} .sq-icon {
             width:30px; height:30px; padding:0; border:0; border-radius:50%;
-            background:rgba(255,255,255,.07); color:inherit; cursor:pointer; font-size:16px;
+            background:rgba(255,255,255,.07); color:#f2f2f2 !important; cursor:pointer; font-size:16px;
+            -webkit-appearance:none; appearance:none;
+            display:inline-flex; align-items:center; justify-content:center;
+            pointer-events:auto !important;
         }
         #${PANEL_ID} .sq-body { flex:1; min-height:0; overflow:auto; padding:16px; }
         #${PANEL_ID} .sq-status { font-size:10px; opacity:.48; margin-bottom:14px; }
@@ -90,7 +93,7 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-option, #${PANEL_ID} .sq-next, #${PANEL_ID} .sq-back {
             width:100%; box-sizing:border-box; padding:10px 12px;
             border:1px solid rgba(255,255,255,.1); border-radius:10px;
-            background:rgba(255,255,255,.055); color:inherit; font:inherit; cursor:pointer;
+            background:rgba(255,255,255,.055); color:#f2f2f2 !important; font:inherit; cursor:pointer;
         }
         #${PANEL_ID} .sq-option { text-align:left; }
         #${PANEL_ID} .sq-option:disabled { opacity:.58; cursor:default; }
@@ -318,7 +321,21 @@ export default 'SideQuest';
             buildGame(panel);
         };
 
-        panel.querySelector('[data-act="close"]').onclick=()=>panel.classList.add('sq-hidden');
+        const closePanel=()=>{
+            panel.classList.add('sq-hidden');
+            panel.style.setProperty('display','none','important');
+        };
+        const closeButton=panel.querySelector('[data-act="close"]');
+        closeButton.addEventListener('pointerup',e=>{
+            e.preventDefault();
+            e.stopPropagation();
+            closePanel();
+        });
+        closeButton.onclick=e=>{
+            e.preventDefault();
+            e.stopPropagation();
+            closePanel();
+        };
         panel.querySelector('[data-act="settings"]').onclick=showSettings;
         panel.querySelector('.sq-back').onclick=back;
         panel.querySelector('.sq-next').onclick=()=>buildGame(panel);
