@@ -3,10 +3,10 @@
   "loading_order": 100,
   "requires": [],
   "optional": [],
-  "js": "sidequest.js",
+  "js": "sidequest-orb.js",
   "css": "sidequest-main.css",
   "author": "yanyan919",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "homePage": "https://github.com/yanyan919/SideQuest",
   "auto_update": true
 }
