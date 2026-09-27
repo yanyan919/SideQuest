@@ -37,9 +37,9 @@ function saveSettings(settings) {
 
 function cleanText(text) {
     return String(text ?? '')
-        .replace(/<br\\s*\\/?>/gi, '\\n')
+        .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<[^>]*>/g, ' ')
-        .replace(/\\s+/g, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
 }
 
@@ -86,10 +86,10 @@ function extractDialogue(message, settings) {
     let match;
 
     // Character: "..."
-    const labeled = /(?:^|\\s)([^:\\n]{1,50})\\s*[:：]\\s*[“"「『]([^”"」』\\n]{8,220})[”"」』]/g;
+    const labeled = /(?:^|\s)([^:\n]{1,50})\s*[:：]\s*[“"「『]([^”"」』\n]{8,220})[”"」』]/g;
     while ((match = labeled.exec(text)) !== null) {
         const candidate = match[1].trim();
-        if (candidate && !/^[\\W_]+$/u.test(candidate)) {
+        if (candidate && !/^[\W_]+$/u.test(candidate)) {
             lines.push({ speaker: candidate, line: match[2].trim(), kind: 'dialogue' });
         }
     }
@@ -104,7 +104,7 @@ function extractDialogue(message, settings) {
 
     // Optional narration source.
     if (settings.includeNarration) {
-        const plain = text.replace(/^[*~_\\-—]+|[*~_\\-—]+$/g, '').trim();
+        const plain = text.replace(/^[*~_\-—]+|[*~_\-—]+$/g, '').trim();
         if (plain.length >= 12 && plain.length <= 220) {
             return [{ speaker: fallbackSpeaker, line: plain, kind: 'narration' }];
         }
@@ -419,7 +419,7 @@ function initSideQuest() {
     function buildWordHunt(sources) {
         if (!settings.wordHunt || !sources.length) return false;
 
-        const eligible = sources.filter(item => item.line.split(/\\s+/).length >= 7);
+        const eligible = sources.filter(item => item.line.split(/\s+/).length >= 7);
         if (!eligible.length) return false;
 
         const target = eligible[Math.floor(Math.random() * Math.min(8, eligible.length))];
@@ -447,7 +447,7 @@ function initSideQuest() {
             options.appendChild(button);
         }
 
-        source.textContent = \`A word from \${target.speaker}\\'s line\`;
+        source.textContent = \`A word from \${target.speaker}\'s line\`;
         return true;
     }
 
