@@ -171,8 +171,8 @@ function makeDraggable(element, handle, { allowButtons = false, onDragged } = {}
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
 
         const next = clamp(element, originLeft + dx, originTop + dy);
-        element.style.left = \`\${next.left}px\`;
-        element.style.top = \`\${next.top}px\`;
+        element.style.left = `${next.left}px`;
+        element.style.top = `${next.top}px`;
         element.style.right = 'auto';
         element.style.bottom = 'auto';
 
@@ -205,7 +205,7 @@ function initSideQuest() {
 
     root = document.createElement('section');
     root.id = 'sidequest-root';
-    root.innerHTML = \`
+    root.innerHTML = `
         <button id="sidequest-fab" type="button" aria-label="Open SideQuest" title="SideQuest">
             <span class="sidequest-fab-icon">📝</span>
         </button>
@@ -281,7 +281,7 @@ function initSideQuest() {
             <div class="sidequest-panel-footer">
                 <span>SideQuest 0.2.0</span><span>Fun first.</span>
             </div>
-        </div>\`;
+        </div>`;
 
     document.body.appendChild(root);
 
@@ -322,8 +322,8 @@ function initSideQuest() {
             const p = panel.getBoundingClientRect();
             const left = Math.max(8, Math.min(f.right - p.width, innerWidth - p.width - 8));
             const top = Math.max(8, Math.min(f.top - 14 - p.height, innerHeight - p.height - 8));
-            panel.style.left = \`\${left}px\`;
-            panel.style.top = \`\${top}px\`;
+            panel.style.left = `${left}px`;
+            panel.style.top = `${top}px`;
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
         }
@@ -379,7 +379,7 @@ function initSideQuest() {
             feedback.className = 'sidequest-feedback sidequest-feedback-good';
         } else {
             chosenButton.classList.add('sidequest-wrong');
-            feedback.textContent = \`Not quite — it was \${answer}.\`;
+            feedback.textContent = `Not quite — it was ${answer}.`;
             feedback.className = 'sidequest-feedback sidequest-feedback-bad';
         }
     }
@@ -397,7 +397,7 @@ function initSideQuest() {
         if (answers.length < 2) return false;
 
         cardLabel.textContent = 'WHO SAID IT?';
-        prompt.textContent = \`“\${target.line}”\`;
+        prompt.textContent = `“${target.line}”`;
         options.innerHTML = '';
         feedback.textContent = '';
         feedback.className = 'sidequest-feedback';
@@ -412,7 +412,7 @@ function initSideQuest() {
             options.appendChild(button);
         }
 
-        source.textContent = \`From: \${target.speaker}\`;
+        source.textContent = `From: ${target.speaker}`;
         return true;
     }
 
@@ -432,7 +432,7 @@ function initSideQuest() {
         const choices = [answer, ...shuffle(uniqueWords.filter(word => word !== answer))].slice(0, 3);
 
         cardLabel.textContent = 'WORD HUNT';
-        prompt.innerHTML = \`Which word appears in this line?<br><br>“\${target.line}”\`;
+        prompt.innerHTML = `Which word appears in this line?<br><br>“${target.line}”`;
         options.innerHTML = '';
         feedback.textContent = '';
         feedback.className = 'sidequest-feedback';
@@ -447,7 +447,7 @@ function initSideQuest() {
             options.appendChild(button);
         }
 
-        source.textContent = \`A word from \${target.speaker}\'s line\`;
+        source.textContent = `A word from ${target.speaker}\'s line`;
         return true;
     }
 
