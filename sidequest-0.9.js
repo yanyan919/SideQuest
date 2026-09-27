@@ -280,7 +280,7 @@ export default 'SideQuest';
 
     function createPanel() {
         document.getElementById(PANEL_ID)?.remove();
-        const panel=document.createElement('section');
+        const panel=document.createElement('div');
         panel.id=PANEL_ID;
         panel.className='sq-hidden';
         panel.innerHTML=`
@@ -330,7 +330,9 @@ export default 'SideQuest';
         const mainView=panel.querySelector('.sq-body');
         const showSettings=()=>{
             const fabRoot=document.getElementById('sidequest-root-v9');
-            if (fabRoot) fabRoot.style.setProperty('display','none','important');
+            const fabOrb=document.getElementById(FAB_ID);
+            if (fabRoot) fabRoot.style.setProperty('display','block','important');
+            if (fabOrb) fabOrb.style.setProperty('display','none','important');
             panel.querySelector('.sq-empty').hidden=true;
             panel.querySelector('.sq-card').hidden=true;
             panel.querySelector('.sq-settings').hidden=false;
@@ -350,7 +352,9 @@ export default 'SideQuest';
             panel.classList.add('sq-hidden');
             panel.style.setProperty('display','none','important');
             const fabRoot=document.getElementById('sidequest-root-v9');
+            const fabOrb=document.getElementById(FAB_ID);
             if (fabRoot) fabRoot.style.setProperty('display','block','important');
+            if (fabOrb) fabOrb.style.setProperty('display','flex','important');
         };
         const closeButton=panel.querySelector('[data-act="close"]');
         closeButton.addEventListener('pointerup',e=>{
@@ -400,6 +404,7 @@ export default 'SideQuest';
             'width:48px !important',
             'height:48px !important',
             'z-index:2147483647 !important',
+            'isolation:isolate !important',
             'font-family:inherit',
             'user-select:none',
             '-webkit-user-select:none',
