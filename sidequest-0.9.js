@@ -46,7 +46,7 @@ export default 'SideQuest';
             right: 18px;
             bottom: 168px;
             width: min(360px, calc(100vw - 24px));
-            height: min(590px, calc(100vh - 190px));
+            height: min(520px, calc(100vh - 210px));
             min-height: 390px;
             z-index: 2147483646 !important;
             display: flex;
@@ -55,10 +55,10 @@ export default 'SideQuest';
             box-sizing: border-box;
             border: 1px solid rgba(255,255,255,.16);
             border-radius: 22px;
-            background: rgba(27,27,33,.62);
+            background: rgba(27,27,33,.80);
             color: var(--SmartThemeBodyColor, #f2f2f2) !important;
             box-shadow: 0 22px 70px rgba(0,0,0,.45);
-            backdrop-filter: blur(18px);
+            backdrop-filter: blur(14px);
         }
         #${PANEL_ID}.sq-hidden { display: none !important; }
         #${PANEL_ID} .sq-head {
@@ -148,7 +148,7 @@ export default 'SideQuest';
         #${SETTINGS_ID} .sq-note { opacity:.55; font-size:11px; line-height:1.5; }
         @media (max-width:600px) {
             #${FAB_ID} { right:14px; bottom:118px; }
-            #${PANEL_ID} { right:12px; bottom:180px; width:calc(100vw - 24px); height:min(570px,calc(100vh - 200px)); }
+            #${PANEL_ID} { right:12px; bottom:180px; width:calc(100vw - 24px); height:min(520px,calc(100vh - 220px)); }
         }
     `;
 
@@ -455,6 +455,7 @@ export default 'SideQuest';
         status.textContent='学习：先看懂，再听一遍。';
         root.querySelector('.sq-label').textContent='LEARN';
         root.querySelector('.sq-prompt').textContent=item.english + (item.translation && item.translation!=='暂无剧情翻译' ? '\n\n' + item.translation : '\n\n（这段剧情没有现成中文翻译）');
+        card.querySelectorAll('.sq-door').forEach(x=>x.remove());
         const box=root.querySelector('.sq-options');
         const feedback=root.querySelector('.sq-feedback');
         box.innerHTML='';
@@ -510,6 +511,7 @@ export default 'SideQuest';
         root.querySelector('.sq-label').textContent='WORD HUNT';
         root.querySelector('.sq-status').textContent=pairs.length ? '语境复习：选出这句话对应的中文意思。' : '词汇复习：先从语境里找出目标词。';
 
+        root.querySelector('.sq-card').querySelectorAll('.sq-door').forEach(x=>x.remove());
         const prompt=root.querySelector('.sq-prompt');
         const box=root.querySelector('.sq-options');
         const feedback=root.querySelector('.sq-feedback');
@@ -568,7 +570,7 @@ export default 'SideQuest';
         const insetBottom=parseFloat(cs.getPropertyValue('--tt-inset-bottom'))||0;
         const margin=12;
         const width=Math.max(280,Math.min(360,vw-margin*2));
-        const height=Math.max(300,Math.min(590,vh-insetTop-insetBottom-24));
+        const height=Math.max(300,Math.min(520,vh-insetTop-insetBottom-24));
         panel.style.setProperty('position','fixed','important');
         panel.style.setProperty('transform','none','important');
         panel.style.setProperty('perspective','none','important');
