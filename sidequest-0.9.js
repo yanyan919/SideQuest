@@ -515,35 +515,30 @@ export default 'SideQuest';
             if (fabRoot) fabRoot.style.setProperty('display','block','important');
             if (fabOrb) fabOrb.style.setProperty('display','none','important');
 
-            // Diagnostic only: keep the real SideQuest window untouched.
-            // If the native/self-hosted ST cannot paint this top-level element,
-            // the problem is outside the game's panel structure.
-            let diagnostic=document.getElementById('sidequest-diagnostic-v9');
-            if (!diagnostic) {
-                diagnostic=document.createElement('div');
-                diagnostic.id='sidequest-diagnostic-v9';
-                diagnostic.textContent='HELLO · SideQuest 浮层测试';
-                diagnostic.style.cssText=[
-                    'position:fixed !important',
-                    'left:20px !important',
-                    'top:20px !important',
-                    'width:280px !important',
-                    'height:110px !important',
-                    'z-index:2147483647 !important',
-                    'display:flex !important',
-                    'align-items:center !important',
-                    'justify-content:center !important',
-                    'box-sizing:border-box !important',
-                    'background:#c62828 !important',
-                    'color:#fff !important',
-                    'font-size:18px !important',
-                    'font-weight:800 !important',
-                    'border:3px solid #fff !important',
-                    'border-radius:16px !important',
-                    'box-shadow:0 12px 40px rgba(0,0,0,.5) !important'
-                ].join(';');
-                (document.body || document.documentElement).appendChild(diagnostic);
-            }
+            // Diagnostic step 2: use the REAL SideQuest panel, but temporarily
+            // strip it down to the same simple kind of floating box that HELLO proved
+            // the native/self-hosted ST can paint. Nothing inside the panel is deleted.
+            panel.style.setProperty('left','20px','important');
+            panel.style.setProperty('top','20px','important');
+            panel.style.setProperty('right','auto','important');
+            panel.style.setProperty('bottom','auto','important');
+            panel.style.setProperty('width','300px','important');
+            panel.style.setProperty('height','320px','important');
+            panel.style.setProperty('min-height','0','important');
+            panel.style.setProperty('display','block','important');
+            panel.style.setProperty('overflow','auto','important');
+            panel.style.setProperty('box-sizing','border-box','important');
+            panel.style.setProperty('background','rgba(40,40,45,.98)','important');
+            panel.style.setProperty('backdrop-filter','none','important');
+            panel.style.setProperty('-webkit-backdrop-filter','none','important');
+            panel.style.setProperty('transform','none','important');
+            panel.style.setProperty('isolation','isolate','important');
+            panel.style.setProperty('border','3px solid #fff','important');
+            panel.style.setProperty('border-radius','16px','important');
+            panel.style.setProperty('box-shadow','0 12px 40px rgba(0,0,0,.5)','important');
+
+            const oldDiagnostic=document.getElementById('sidequest-diagnostic-v9');
+            if (oldDiagnostic) oldDiagnostic.remove();
 
             try {
                 buildGame(panel);
