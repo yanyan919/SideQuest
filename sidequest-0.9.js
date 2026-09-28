@@ -304,47 +304,57 @@ export default 'SideQuest';
             if(!result.some(x=>x.key===key)) result.push({speaker,line:value,kind,key});
         };
 
-        const userName=String(ctx()?.name1||'').trim();
-        const userNames=new Set([userName,'You','User'].filter(Boolean).map(x=>x.toLowerCase()));
-        const escapeRegExp=value=>String(value).replace(/[-\/\\^$*+?.()|[\]{}]/g,'\\    function sources() {
-        const s=loadSettings();
-        const result=[];
-        const pushUnique=(speaker,line,kind)=>{
-            const value=clean(line);
-            if(!value || value.length<4 || value.length>280) return;
-            const key=kind+'|'+speaker+'|'+value;
-            if(!result.some(x=>x.key===key)) result.push({speaker,line:value,kind,key});
+        const userName=String(ctx()?.name1||'').trim().toLowerCase();
+        const isUserSpeaker=name=>{
+            const n=String(name||'').trim().toLowerCase();
+            return n==='you' || n==='user' || n==='{{user}}' || (userName && n===userName);
         };
 
         for(const message of chatMessages()){
-            const raw=clean(message.mes);
-            if(!raw) continue;
-            if(message.is_user){
-                if(s.includeUser && raw.length>=4 && raw.length<=280) pushUnique('You',raw,'user');
-                continue;
-            }
+            // 只从 AI/角色回复正文抓取；用户自己发给 AI 的消息永远不进题目池。
+            if(message.is_user) continue;
 
-            const fallbackSpeaker=String(message.name||message.ch_name||'Character').trim()||'Character';
+            const speaker=String(message.name||message.ch_name||'Character').trim()||'Character';
+            let raw=clean(message.mes);
+            if(!raw) continue;
+
+            // *xxx* 是内心话，不是对白。
+            raw=clean(raw.replace(/\*[\s\S]*?\*/g,' '));
+            if(!raw) continue;
+
             const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
             const text=lines.join('\n');
-            let speaker=fallbackSpeaker;
             const explicitPrefix=/^([^:：\n]{1,40})[:：]\s*(.+)$/;
-            const prefixMatch=explicitPrefix.exec(lines[0]||'');
-            if((!message.name || /^(Character|Unknown)$/i.test(speaker)) && prefixMatch) speaker=prefixMatch[1].trim()||speaker;
-
             const dialogueRanges=[];
             const addDialogue=line=>{ if(s.includeCharacter) pushUnique(speaker,line,'dialogue'); };
 
-            const quoteRe=/[“「『"]([\s\S]{4,260}?)[”」』"]/g;
-            let match;
-            while((match=quoteRe.exec(text))){ dialogueRanges.push([match.index,quoteRe.lastIndex]); addDialogue(match[1]); }
-
-            const pairRe=/([A-Za-z][A-Za-z'’.,!?;:\-\s]{2,240})[（(]([^）)]{1,220})[）)]/g;
-            while((match=pairRe.exec(text))){ dialogueRanges.push([match.index,pairRe.lastIndex]); addDialogue(match[0]); }
-
+            // Name: dialogue / Name：dialogue
             for(const line of lines){
                 const m=explicitPrefix.exec(line);
-                if(m && /[A-Za-z]{2,}/.test(m[2]) && s.includeCharacter) pushUnique(m[1].trim()||speaker,m[2],'dialogue');
+                if(m && /[A-Za-z]{2,}/.test(m[2])){
+                    if(isUserSpeaker(m[1])) continue;
+                    if(s.includeCharacter) pushUnique(m[1].trim()||speaker,m[2],'dialogue');
+                    const pos=text.indexOf(line);
+                    if(pos>=0) dialogueRanges.push([pos,pos+line.length]);
+                }
+            }
+
+            // “...” / "..." / 「...」 / 『...』
+            const quoteRe=/[“「『"]([\s\S]{4,260}?)[”」』"]/g;
+            let match;
+            while((match=quoteRe.exec(text))){
+                const before=text.slice(Math.max(0,match.index-70),match.index);
+                // 明确写成 You: / User: 的对白不抓。
+                if(/(?:^|[\s])(you|user)\s*[:：]\s*$/i.test(before)) continue;
+                dialogueRanges.push([match.index,quoteRe.lastIndex]);
+                addDialogue(match[1]);
+            }
+
+            // English（中文） / English(中文)
+            const pairRe=/([A-Za-z][A-Za-z'’.,!?;:\-\s]{2,240})[（(]([^）)]{1,220})[）)]/g;
+            while((match=pairRe.exec(text))){
+                dialogueRanges.push([match.index,pairRe.lastIndex]);
+                addDialogue(match[0]);
             }
 
             if(s.includeNarration){
@@ -357,7 +367,7 @@ export default 'SideQuest';
                     }
                     const after=text.slice(cursor).trim();
                     if(after) pushUnique(speaker,after,'narration');
-                } else if(text.length>=12 && text.length<=280) {
+                }else if(text.length>=12 && text.length<=280){
                     pushUnique(speaker,text,'narration');
                 }
             }
@@ -365,7 +375,7 @@ export default 'SideQuest';
         return result;
     }
 
-    function addStyle');
+    function addStyle    function addStyle');
 
         for(const message of chatMessages()){
             if(message.is_user) continue;
@@ -1455,7 +1465,6 @@ export default 'SideQuest';
                     <details class="sq-details">
                         <summary>题目素材</summary>
                         <div class="sq-details-body">
-                            <label class="sq-setting-row"><input type="checkbox" data-key="includeUser"><span>我的对白</span></label>
                             <label class="sq-setting-row"><input type="checkbox" data-key="includeCharacter"><span>角色对白</span></label>
                             <label class="sq-setting-row"><input type="checkbox" data-key="includeNarration"><span>旁白</span></label>
                         </div>
@@ -1477,7 +1486,7 @@ export default 'SideQuest';
                             <div class="sq-note">留空就是默认玻璃面板。</div>
                         </div>
                     </details>
-                    <button class="sq-back" type="button">🚪 回到选择</button>
+                    
                 </div>
             </div>`;
         // IMPORTANT: ST's mobile page can apply transforms/stacking rules to <body>.
