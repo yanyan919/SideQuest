@@ -280,7 +280,7 @@ export default 'SideQuest';
         menu.hidden=false;
         status.textContent='从最近的剧情里挑一个小游戏。';
 
-        menu.innerHTML=\`
+        menu.innerHTML=`
             <button type="button" class="sq-game-choice" data-game="word">
                 <span class="sq-game-emoji">🔎</span>
                 <span><b>单词寻宝</b><small>从刚才的剧情里抓一个英文单词</small></span>
@@ -297,7 +297,7 @@ export default 'SideQuest';
                 <span class="sq-game-emoji">🪄</span>
                 <span><b>句子拼图</b><small>把剧情里的句子重新拼起来</small><em>准备中</em></span>
             </button>
-        \`;
+        `;
 
         menu.querySelectorAll('[data-game]').forEach(button=>{
             button.onclick=()=>{
