@@ -78,7 +78,7 @@ export default 'SideQuest';
             pointer-events:auto !important;
         }
         #${PANEL_ID} .sq-body { flex:1; min-height:0; overflow:auto; padding:16px; }
-        #${PANEL_ID} .sq-status { font-size:10px; opacity:.48; margin-bottom:14px; }
+        #\${PANEL_ID} .sq-status { font-size:9px; opacity:.42; margin-bottom:9px; }
         #${PANEL_ID} .sq-empty { text-align:center; padding:50px 12px 20px; }
         #${PANEL_ID} .sq-empty-icon { font-size:34px; margin-bottom:9px; }
         #${PANEL_ID} .sq-empty-title { font-weight:750; font-size:16px; }
@@ -88,16 +88,33 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-card[hidden],
         #${PANEL_ID} .sq-empty[hidden],
         #${PANEL_ID} .sq-settings[hidden] { display:none !important; }
-        #${PANEL_ID} .sq-door {
-            position:absolute; left:10px; bottom:10px; z-index:4;
-            width:26px; height:26px; padding:0; border:0; border-radius:50%;
-            background:rgba(255,255,255,.045); color:#fff !important; opacity:.28;
-            font-size:13px; cursor:pointer;
+        #\${PANEL_ID} .sq-door {
+            position:absolute; top:7px; right:8px; left:auto; bottom:auto; z-index:4;
+            width:21px; height:21px; padding:0; border:0; border-radius:50%;
+            background:transparent; color:#fff !important; opacity:.20;
+            font-size:11px; line-height:21px; cursor:pointer;
         }
-        #${PANEL_ID} .sq-door:active { opacity:.7; transform:scale(.94); }
-        #${PANEL_ID} .sq-learn-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
-        #${PANEL_ID} .sq-learn-actions .sq-option { text-align:center; }
-        #${PANEL_ID} .sq-source { margin-top:9px; font-size:9px; opacity:.38; line-height:1.45; }
+        #\${PANEL_ID} .sq-door:active { opacity:.72; transform:scale(.94); }
+        #\${PANEL_ID} .sq-learn-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:9px; }
+        #\${PANEL_ID} .sq-learn-actions .sq-option { text-align:center; }
+        #\${PANEL_ID} .sq-mini-action {
+            width:100%; box-sizing:border-box; padding:9px 10px; margin-top:8px;
+            border:1px solid rgba(255,255,255,.08); border-radius:10px;
+            background:rgba(255,255,255,.045); color:#f2f2f2 !important; font:inherit; cursor:pointer; font-size:11px;
+        }
+        #\${PANEL_ID} .sq-prompt-row { display:flex; align-items:flex-start; gap:7px; }
+        #\${PANEL_ID} .sq-prompt-main { min-width:0; flex:1; white-space:pre-wrap; }
+        #\${PANEL_ID} .sq-inline-speak {
+            flex:0 0 auto; width:27px; height:27px; padding:0; border:0; border-radius:50%;
+            background:rgba(255,255,255,.055); color:#fff !important; font-size:13px; cursor:pointer; opacity:.72;
+        }
+        #\${PANEL_ID} .sq-inline-speak:active { transform:scale(.92); opacity:1; }
+        #\${PANEL_ID} .sq-translation {
+            margin-top:9px; padding:9px 10px; border-radius:10px;
+            background:rgba(255,255,255,.035); font-size:12px; line-height:1.5;
+        }
+        #\${PANEL_ID} .sq-context { margin-top:9px; font-size:10px; line-height:1.5; opacity:.48; }
+        #\${PANEL_ID} .sq-source { margin-top:9px; font-size:9px; opacity:.38; line-height:1.45; }
         #${PANEL_ID} .sq-record-note { margin-top:10px; padding:9px 10px; border-radius:10px; background:rgba(255,255,255,.035); font-size:10px; line-height:1.5; opacity:.58; }
         #${PANEL_ID} .sq-game-choice {
             width:100%; display:flex; align-items:center; gap:12px; box-sizing:border-box;
@@ -111,8 +128,9 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-game-choice b { display:block; font-size:13px; }
         #${PANEL_ID} .sq-game-choice small { display:block; margin-top:4px; font-size:10px; opacity:.52; line-height:1.4; }
         #${PANEL_ID} .sq-game-choice em { display:inline-block; margin-top:5px; font-size:9px; font-style:normal; opacity:.4; }
-        #${PANEL_ID} .sq-card {
-            padding:15px; border:1px solid rgba(255,255,255,.09);
+        #\${PANEL_ID} .sq-card {
+            position:relative; padding:13px; padding-top:17px;
+            border:1px solid rgba(255,255,255,.09);
             border-radius:16px; background:rgba(255,255,255,.045);
         }
         #${PANEL_ID} .sq-label { font-size:9px; letter-spacing:.14em; font-weight:800; opacity:.45; margin-bottom:10px; }
@@ -177,17 +195,21 @@ export default 'SideQuest';
         return String(value || '')
             .replace(/<br\s*\/?\s*>/gi, '\n')
             .replace(/<[^>]*>/g, ' ')
-            .replace(/\s+/g, ' ')
+            .replace(/\r/g, '')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n\s*\n+/g, '\n')
+            .replace(/^[ \n]+|[ \n]+$/g, '')
             .trim();
     }
-
 
     function speakText(text, lang='en-US') {
         try {
             const synth=globalThis.speechSynthesis;
             if (!synth || !text) return false;
             synth.cancel();
-            const utterance=new SpeechSynthesisUtterance(String(text));
+            const spoken=String(text).replace(/[\u0000-\u001F\u007F]/g,' ').replace(/\s+/g,' ').trim();
+            if (!spoken) return false;
+            const utterance=new SpeechSynthesisUtterance(spoken);
             utterance.lang=lang;
             utterance.rate=0.82;
             utterance.pitch=1;
@@ -210,14 +232,15 @@ export default 'SideQuest';
 
     function learningItems(list) {
         const items=[];
+        const stopWords=new Set(['that','this','with','have','from','your','there','their','they','them','then','were','what','when','where','which','would','could','should','about','into','just','like','really','very','been','will','shall','you','she','her','his','him','the','and','for','not','but','are','was']);
         for (const item of list) {
             const pairs=englishPairs(item.line);
             if (pairs.length) {
-                for (const pair of pairs) items.push({...pair,speaker:item.speaker,source:item.line});
+                for (const pair of pairs) items.push({...pair,speaker:item.speaker,source:item.line,kind:item.kind});
                 continue;
             }
-            const words=[...new Set((item.line.match(/[A-Za-z]{3,}/g)||[]).map(x=>x.toLowerCase()))];
-            for (const word of words) items.push({english:word,translation:'暂无剧情翻译',speaker:item.speaker,source:item.line});
+            const words=[...new Set((item.line.match(/[A-Za-z]{4,}/g)||[]).map(x=>x.toLowerCase()).filter(x=>!stopWords.has(x)))];
+            for (const word of words.slice(0,6)) items.push({english:word,translation:'暂无剧情翻译',speaker:item.speaker,source:item.line,kind:item.kind});
         }
         return items;
     }
@@ -278,29 +301,59 @@ export default 'SideQuest';
     }
 
     function sources() {
-        const s = loadSettings();
-        const result = [];
-        for (const message of chatMessages()) {
-            const text = clean(message.mes);
-            const speaker = message.is_user ? 'You' : (String(message.name || message.ch_name || 'Character').trim() || 'Character');
-            if (!text) continue;
+        const s=loadSettings();
+        const result=[];
+        const pushUnique=(speaker,line,kind)=>{
+            const value=clean(line);
+            if(!value || value.length<4 || value.length>280) return;
+            const key=kind+'|'+speaker+'|'+value;
+            if(!result.some(x=>x.key===key)) result.push({speaker,line:value,kind,key});
+        };
 
-            if (message.is_user) {
-                if (!s.includeUser) continue;
-                if (text.length >= 8 && text.length <= 260) result.push({ speaker, line: text });
+        for(const message of chatMessages()){
+            const raw=clean(message.mes);
+            if(!raw) continue;
+            if(message.is_user){
+                if(s.includeUser && raw.length>=4 && raw.length<=280) pushUnique('You',raw,'user');
                 continue;
             }
 
-            let foundQuote = false;
-            const re = /[“"]([^“”"]{8,240})[”"]/g;
+            const fallbackSpeaker=String(message.name||message.ch_name||'Character').trim()||'Character';
+            const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+            const text=lines.join('\n');
+            let speaker=fallbackSpeaker;
+            const explicitPrefix=/^([^:：\n]{1,40})[:：]\s*(.+)$/;
+            const prefixMatch=explicitPrefix.exec(lines[0]||'');
+            if((!message.name || /^(Character|Unknown)$/i.test(speaker)) && prefixMatch) speaker=prefixMatch[1].trim()||speaker;
+
+            const dialogueRanges=[];
+            const addDialogue=line=>{ if(s.includeCharacter) pushUnique(speaker,line,'dialogue'); };
+
+            const quoteRe=/[“「『"]([\s\S]{4,260}?)[”」』"]/g;
             let match;
-            while ((match = re.exec(text))) {
-                foundQuote = true;
-                if (s.includeCharacter) result.push({ speaker, line: match[1].trim() });
+            while((match=quoteRe.exec(text))){ dialogueRanges.push([match.index,quoteRe.lastIndex]); addDialogue(match[1]); }
+
+            const pairRe=/([A-Za-z][A-Za-z'’.,!?;:\-\s]{2,240})[（(]([^）)]{1,220})[）)]/g;
+            while((match=pairRe.exec(text))){ dialogueRanges.push([match.index,pairRe.lastIndex]); addDialogue(match[0]); }
+
+            for(const line of lines){
+                const m=explicitPrefix.exec(line);
+                if(m && /[A-Za-z]{2,}/.test(m[2]) && s.includeCharacter) pushUnique(m[1].trim()||speaker,m[2],'dialogue');
             }
 
-            if (!foundQuote && s.includeNarration && text.length >= 12 && text.length <= 260) {
-                result.push({ speaker, line: text });
+            if(s.includeNarration){
+                if(dialogueRanges.length){
+                    let cursor=0;
+                    for(const [start,end] of dialogueRanges.sort((a,b)=>a[0]-b[0])){
+                        const before=text.slice(cursor,start).trim();
+                        if(before) pushUnique(speaker,before,'narration');
+                        cursor=Math.max(cursor,end);
+                    }
+                    const after=text.slice(cursor).trim();
+                    if(after) pushUnique(speaker,after,'narration');
+                } else if(text.length>=12 && text.length<=280) {
+                    pushUnique(speaker,text,'narration');
+                }
             }
         }
         return result;
@@ -437,124 +490,109 @@ export default 'SideQuest';
 
 
     function buildLearn(root,listArg) {
-        const list=listArg || sources();
+        const list=listArg||sources();
         let items=learningItems(list);
         const s=loadSettings();
-        if (!s.repeatLearned && s.learningRecord) items=items.filter(x=>!hasLearned(x));
-        const empty=root.querySelector('.sq-empty');
-        const card=root.querySelector('.sq-card');
-        const menu=root.querySelector('.sq-game-menu');
-        const status=root.querySelector('.sq-status');
-        if (!items.length) {
-            empty.hidden=false; card.hidden=true; menu.hidden=true;
-            status.textContent='这些剧情里的内容都已经学过啦。';
-            return;
-        }
+        if(!s.repeatLearned && s.learningRecord) items=items.filter(x=>!hasLearned(x));
+        const empty=root.querySelector('.sq-empty'), card=root.querySelector('.sq-card'), menu=root.querySelector('.sq-game-menu'), status=root.querySelector('.sq-status');
+        if(!items.length){ empty.hidden=false; card.hidden=true; menu.hidden=true; status.textContent='这些剧情里的内容都已经学过啦。'; return; }
+
         const item=items[Math.floor(Math.random()*items.length)];
         empty.hidden=true; menu.hidden=true; card.hidden=false;
-        status.textContent='学习：先看懂，再听一遍。';
+        status.textContent='先看懂，再自己判断一次。';
         root.querySelector('.sq-label').textContent='LEARN';
-        root.querySelector('.sq-prompt').textContent=item.english + (item.translation && item.translation!=='暂无剧情翻译' ? '\n\n' + item.translation : '\n\n（这段剧情没有现成中文翻译）');
         card.querySelectorAll('.sq-door').forEach(x=>x.remove());
-        const box=root.querySelector('.sq-options');
-        const feedback=root.querySelector('.sq-feedback');
-        box.innerHTML='';
-        feedback.textContent=item.translation==='暂无剧情翻译' ? '这段剧情没有现成翻译，先记住原文即可。' : '上面的中文来自剧情原文，不是 SideQuest 临时翻译的。';
-        const actions=document.createElement('div');
-        actions.className='sq-learn-actions';
 
-        const listen=document.createElement('button');
-        listen.type='button'; listen.className='sq-option'; listen.textContent='🔊 听发音';
-        listen.onclick=()=>{
-            if (!speakText(item.english,'en-US')) feedback.textContent='当前设备没有可用的系统 TTS。';
-            else feedback.textContent='🔊 正在播放……';
+        const prompt=root.querySelector('.sq-prompt'), box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
+        box.innerHTML=''; feedback.textContent='';
+
+        const row=document.createElement('div'); row.className='sq-prompt-row';
+        const main=document.createElement('div'); main.className='sq-prompt-main'; main.textContent=item.english; row.appendChild(main);
+        const speak=document.createElement('button'); speak.type='button'; speak.className='sq-inline-speak'; speak.textContent='🔊'; speak.title='听发音'; speak.setAttribute('aria-label','听发音'); speak.onclick=()=>speakText(item.english,'en-US'); row.appendChild(speak);
+        prompt.innerHTML=''; prompt.appendChild(row);
+
+        const translation=document.createElement('div');
+        translation.className='sq-translation';
+        translation.hidden=item.translation==='暂无剧情翻译';
+        translation.textContent=item.translation==='暂无剧情翻译'?'这段剧情没有现成中文翻译。':item.translation;
+        prompt.appendChild(translation);
+
+        const reveal=document.createElement('button');
+        reveal.type='button'; reveal.className='sq-mini-action';
+        reveal.textContent=item.translation==='暂无剧情翻译'?'继续':'👀 看意思';
+
+        const actions=document.createElement('div'); actions.className='sq-learn-actions'; actions.hidden=true;
+        const learned=document.createElement('button'); learned.type='button'; learned.className='sq-option'; learned.textContent='✓ 会了';
+        learned.onclick=()=>{ markLearned(item); feedback.textContent='已记住。'; setTimeout(()=>{ if(root.dataset.sqGame==='learn') buildLearn(root,sources()); },420); };
+        const notYet=document.createElement('button'); notYet.type='button'; notYet.className='sq-option'; notYet.textContent='↻ 还不会';
+        notYet.onclick=()=>{ markMistake(item,'还不会'); feedback.textContent='没关系，记一下，再换一个。'; setTimeout(()=>{ if(root.dataset.sqGame==='learn') buildLearn(root,sources()); },620); };
+        actions.appendChild(learned); actions.appendChild(notYet);
+
+        reveal.onclick=()=>{
+            translation.hidden=false; actions.hidden=false; reveal.remove();
+            feedback.textContent=item.translation==='暂无剧情翻译'?'没有现成翻译，先记住这个词/短语在剧情里的用法。':'现在再看看自己能不能记住。';
         };
-        actions.appendChild(listen);
+        box.appendChild(reveal); box.appendChild(actions);
 
-        const learned=document.createElement('button');
-        learned.type='button'; learned.className='sq-option'; learned.textContent='✓ 我认识了';
-        learned.onclick=()=>{
-            markLearned(item);
-            feedback.textContent='已记入学习记录。下一条。';
-            setTimeout(()=>buildLearn(root,sources()),220);
-        };
-        actions.appendChild(learned);
-        box.appendChild(actions);
+        const context=document.createElement('div'); context.className='sq-context'; context.textContent='原句：'+item.source; box.appendChild(context);
+        const source=document.createElement('div'); source.className='sq-source'; source.textContent='来自：'+item.speaker; box.appendChild(source);
 
-        const source=document.createElement('div');
-        source.className='sq-source';
-        source.textContent='来自：'+item.speaker;
-        box.appendChild(source);
-
-        const door=document.createElement('button');
-        door.type='button'; door.className='sq-door'; door.textContent='🚪'; door.title='回到选择';
+        const door=document.createElement('button'); door.type='button'; door.className='sq-door'; door.textContent='🚪'; door.title='回到选择';
         door.onclick=()=>{ root.dataset.sqGame='menu'; buildGame(root); };
         card.appendChild(door);
     }
 
     function buildWord(root,listArg) {
-        const list=listArg || sources();
-        const pairs=list.flatMap(item=>englishPairs(item.line).map(pair=>({...pair,speaker:item.speaker,source:item.line})));
+        const list=listArg||sources();
+        const pairs=list.flatMap(item=>englishPairs(item.line).map(pair=>({...pair,speaker:item.speaker,source:item.line,kind:item.kind})));
         const allItems=learningItems(list);
-        const pool=pairs.length ? pairs : allItems.filter(x=>/[A-Za-z]{3,}/.test(x.english||''));
-        if (!pool.length) {
-            root.querySelector('.sq-empty').hidden=false;
-            root.querySelector('.sq-card').hidden=true;
-            root.querySelector('.sq-game-menu').hidden=true;
-            root.querySelector('.sq-status').textContent='找到剧情了，但暂时没有英文。';
-            return;
-        }
-        const target=pool[Math.floor(Math.random()*pool.length)];
-        root.querySelector('.sq-empty').hidden=true;
-        root.querySelector('.sq-game-menu').hidden=true;
-        root.querySelector('.sq-card').hidden=false;
-        root.querySelector('.sq-label').textContent='WORD HUNT';
-        root.querySelector('.sq-status').textContent=pairs.length ? '语境复习：选出这句话对应的中文意思。' : '词汇复习：先从语境里找出目标词。';
+        const pool=pairs.length?pairs:allItems.filter(x=>/[A-Za-z]{3,}/.test(x.english||''));
+        if(!pool.length){ root.querySelector('.sq-empty').hidden=false; root.querySelector('.sq-card').hidden=true; root.querySelector('.sq-game-menu').hidden=true; root.querySelector('.sq-status').textContent='找到剧情了，但暂时没有英文。'; return; }
 
-        root.querySelector('.sq-card').querySelectorAll('.sq-door').forEach(x=>x.remove());
-        const prompt=root.querySelector('.sq-prompt');
-        const box=root.querySelector('.sq-options');
-        const feedback=root.querySelector('.sq-feedback');
+        const target=pool[Math.floor(Math.random()*pool.length)];
+        root.querySelector('.sq-empty').hidden=true; root.querySelector('.sq-game-menu').hidden=true; root.querySelector('.sq-card').hidden=false;
+        root.querySelector('.sq-label').textContent='WORD HUNT';
+        root.querySelector('.sq-status').textContent=pairs.length?'语境复习：选出这句话最符合的意思。':'词汇复习：从原句里找出目标词。';
+
+        const card=root.querySelector('.sq-card'); card.querySelectorAll('.sq-door').forEach(x=>x.remove());
+        const prompt=root.querySelector('.sq-prompt'), box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
         box.innerHTML=''; feedback.textContent='';
 
-        if (pairs.length) {
-            prompt.textContent='哪一个中文意思最符合这句剧情？\n\n'+target.english;
-            const other=pairs.filter(x=>x!==target && x.translation!==target.translation).map(x=>x.translation).filter(Boolean);
+        const row=document.createElement('div'); row.className='sq-prompt-row';
+        const main=document.createElement('div'); main.className='sq-prompt-main'; main.textContent=pairs.length?target.english:'哪个单词真的出现在这句剧情里？\n'+target.english; row.appendChild(main);
+        const speak=document.createElement('button'); speak.type='button'; speak.className='sq-inline-speak'; speak.textContent='🔊'; speak.title='听这句'; speak.setAttribute('aria-label','听这句'); speak.onclick=()=>speakText(target.english,'en-US'); row.appendChild(speak);
+        prompt.innerHTML=''; prompt.appendChild(row);
+
+        if(pairs.length){
+            const other=pairs.filter(x=>x!==target&&x.translation!==target.translation).map(x=>x.translation).filter(Boolean);
             const fallbacks=['她没有回答，只是看着你。','他似乎没有想到会这样。','你决定暂时保持沉默。'];
-            const choices=[target.translation,...other,...fallbacks].filter((x,i,a)=>x && a.indexOf(x)===i).slice(0,3);
+            const choices=[target.translation,...other,...fallbacks].filter((x,i,a)=>x&&a.indexOf(x)===i).slice(0,3);
             while(choices.length<3) choices.push(['先离开这里。','她轻轻笑了起来。','你不知道该说什么。'][choices.length-1]);
-            renderChoices(root,choices,target.translation,'答对了！','再看看这句：'+target.translation);
-            const listen=document.createElement('button');
-            listen.type='button'; listen.className='sq-option'; listen.textContent='🔊 听这句';
-            listen.onclick=()=>speakText(target.english,'en-US');
-            box.appendChild(listen);
-        } else {
+            renderChoices(root,choices,target.translation,'答对了！','再看看这句：'+target.translation,target);
+        }else{
             const words=[...new Set((target.english.match(/[A-Za-z]{3,}/g)||[]).map(x=>x.toLowerCase()))];
             const answer=words[Math.floor(Math.random()*words.length)];
-            prompt.textContent='哪个单词真的出现在这句剧情里？\n\n'+target.english;
             const distract=['different','punishment','theater','quiet','really','master','always','little'].filter(x=>x!==answer).slice(0,2);
-            renderChoices(root,[answer,...distract],answer,'抓到了！','答案是 '+answer+'。');
+            renderChoices(root,[answer,...distract],answer,'抓到了！','答案是 '+answer+'。',target);
         }
 
-        const door=document.createElement('button');
-        door.type='button'; door.className='sq-door'; door.textContent='🚪'; door.title='回到选择';
+        const context=document.createElement('div'); context.className='sq-context'; context.textContent='来自：'+target.speaker; box.appendChild(context);
+        const door=document.createElement('button'); door.type='button'; door.className='sq-door'; door.textContent='🚪'; door.title='回到选择';
         door.onclick=()=>{ root.dataset.sqGame='menu'; buildGame(root); };
-        root.querySelector('.sq-card').appendChild(door);
+        card.appendChild(door);
     }
 
-    function renderChoices(root,choices,answer,okText,badText) {
-        const box=root.querySelector('.sq-options');
-        const feedback=root.querySelector('.sq-feedback');
+    function renderChoices(root,choices,answer,okText,badText,item) {
+        const box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
         box.innerHTML=''; feedback.textContent='';
         choices.sort(()=>Math.random()-.5).forEach(choice=>{
-            const b=document.createElement('button');
-            b.type='button'; b.className='sq-option'; b.textContent=choice;
+            const b=document.createElement('button'); b.type='button'; b.className='sq-option'; b.textContent=choice;
             b.onclick=()=>{
-                [...box.children].forEach(x=>x.disabled=true);
-                const ok=choice===answer;
-                b.classList.add(ok?'sq-ok':'sq-bad');
-                if (!ok) markMistake({english:answer,translation:badText.replace(/^再看看这句：/,'')},choice);
-                feedback.textContent=ok?'✨ '+okText:' '+badText;
+                [...box.querySelectorAll('.sq-option')].forEach(x=>x.disabled=true);
+                const ok=choice===answer; b.classList.add(ok?'sq-ok':'sq-bad');
+                if(ok){ markLearned(item); feedback.textContent='✨ '+okText; }
+                else { markMistake(item,choice); feedback.textContent=' '+badText; }
+                setTimeout(()=>{ if(root.dataset.sqGame==='word') buildWord(root,sources()); },700);
             };
             box.appendChild(b);
         });
