@@ -108,9 +108,9 @@ export default 'SideQuest';
             background:rgba(255,255,255,.055); color:#fff !important; font-size:13px; cursor:pointer; opacity:.72;
         }
         #${PANEL_ID} .sq-inline-speak:active { transform:scale(.92); opacity:1; }
-        #${PANEL_ID} .sq-translation {
-            margin-top:9px; padding:9px 10px; border-radius:10px;
-            background:rgba(255,255,255,.035); font-size:12px; line-height:1.5;
+        #\${PANEL_ID} .sq-meaning {
+            margin-top:7px; padding:2px 2px 0;
+            color:inherit; font-size:11px; line-height:1.5; opacity:.62;
         }
         #${PANEL_ID} .sq-context { margin-top:9px; font-size:10px; line-height:1.5; opacity:.48; }
         #${PANEL_ID} .sq-source { margin-top:9px; font-size:9px; opacity:.38; line-height:1.45; }
