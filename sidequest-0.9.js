@@ -163,6 +163,47 @@ export default 'SideQuest';
             .trim();
     }
 
+
+    function speakText(text, lang='en-US') {
+        try {
+            const synth=globalThis.speechSynthesis;
+            if (!synth || !text) return false;
+            synth.cancel();
+            const utterance=new SpeechSynthesisUtterance(String(text));
+            utterance.lang=lang;
+            utterance.rate=0.82;
+            utterance.pitch=1;
+            synth.speak(utterance);
+            return true;
+        } catch { return false; }
+    }
+
+    function englishPairs(text) {
+        const out=[];
+        const re=/([A-Za-z][A-Za-z'’.,!? -]{1,180})[（(]([^）)]{1,220})[）)]/g;
+        let m;
+        while ((m=re.exec(text))) {
+            const english=m[1].trim().replace(/^[\s"'“”]+|[\s"'“”]+$/g,'');
+            const translation=m[2].trim();
+            if (/[A-Za-z]{2,}/.test(english) && translation) out.push({english,translation});
+        }
+        return out;
+    }
+
+    function learningItems(list) {
+        const items=[];
+        for (const item of list) {
+            const pairs=englishPairs(item.line);
+            if (pairs.length) {
+                for (const pair of pairs) items.push({...pair,speaker:item.speaker,source:item.line});
+                continue;
+            }
+            const words=[...new Set((item.line.match(/[A-Za-z]{3,}/g)||[]).map(x=>x.toLowerCase()))];
+            for (const word of words) items.push({english:word,translation:'暂无剧情翻译',speaker:item.speaker,source:item.line});
+        }
+        return items;
+    }
+
     function sources() {
         const s = loadSettings();
         const result = [];
@@ -231,6 +272,7 @@ export default 'SideQuest';
         if (panel.querySelector('.sq-settings')?.hidden === false) return;
         const mode=panel.dataset.sqGame || 'menu';
         if (mode === 'word') buildWord(panel);
+        else if (mode === 'learn') buildLearn(panel);
         else buildGame(panel);
     }
 
@@ -281,6 +323,10 @@ export default 'SideQuest';
         status.textContent='从最近的剧情里挑一个小游戏。';
 
         menu.innerHTML=`
+            <button type="button" class="sq-game-choice" data-game="learn">
+                <span class="sq-game-emoji">📖</span>
+                <span><b>学习</b><small>先把剧情里不会的英文看懂、听懂</small></span>
+            </button>
             <button type="button" class="sq-game-choice" data-game="word">
                 <span class="sq-game-emoji">🔎</span>
                 <span><b>单词寻宝</b><small>从刚才的剧情里抓一个英文单词</small></span>
@@ -302,6 +348,12 @@ export default 'SideQuest';
         menu.querySelectorAll('[data-game]').forEach(button=>{
             button.onclick=()=>{
                 const game=button.dataset.game;
+                if (game === 'learn') {
+                    root.dataset.sqGame='learn';
+                    root.querySelector('.sq-game-menu').hidden=true;
+                    buildLearn(root,list);
+                    return;
+                }
                 if (game !== 'word') return;
                 root.dataset.sqGame='word';
                 root.querySelector('.sq-game-menu').hidden=true;
@@ -310,22 +362,73 @@ export default 'SideQuest';
         });
     }
 
-    function buildWord(root,listArg) {
+
+    function buildLearn(root,listArg) {
         const list=listArg || sources();
-        const usable=list.filter(x=>(x.line.match(/[A-Za-z]{4,}/g)||[]).length>=3);
-        if (!usable.length) {
-            root.querySelector('.sq-empty').hidden=false;
-            root.querySelector('.sq-card').hidden=true;
-            root.querySelector('.sq-status').textContent='找到剧情了，但暂时没有足够长的英文单词。';
+        const items=learningItems(list);
+        const empty=root.querySelector('.sq-empty');
+        const card=root.querySelector('.sq-card');
+        const menu=root.querySelector('.sq-game-menu');
+        const status=root.querySelector('.sq-status');
+        if (!items.length) {
+            empty.hidden=false; card.hidden=true; menu.hidden=true;
+            status.textContent='找到剧情了，但暂时没有可学习的英文。';
             return;
         }
-        const target=usable[Math.floor(Math.random()*usable.length)];
-        const words=[...new Set((target.line.match(/[A-Za-z]{4,}/g)||[]).map(x=>x.toLowerCase()))];
-        const answer=words[Math.floor(Math.random()*words.length)];
-        const choices=[answer,...words.filter(x=>x!==answer).sort(()=>Math.random()-.5)].slice(0,3);
+        const item=items[Math.floor(Math.random()*items.length)];
+        empty.hidden=true; menu.hidden=true; card.hidden=false;
+        status.textContent='学习模式：先看懂，再听一遍。';
+        root.querySelector('.sq-label').textContent='LEARN';
+        root.querySelector('.sq-prompt').textContent=item.english + (item.translation && item.translation!=='暂无剧情翻译' ? '\\n\\n' + item.translation : '\\n\\n（这段剧情没有现成中文翻译）');
+        const box=root.querySelector('.sq-options');
+        const feedback=root.querySelector('.sq-feedback');
+        box.innerHTML='';
+        feedback.textContent=item.translation==='暂无剧情翻译' ? '可以先记住原文；以后可以接入翻译能力。' : '这是剧情里已有的翻译，不是 SideQuest 重新翻译的。';
+        const listen=document.createElement('button');
+        listen.type='button';
+        listen.className='sq-option';
+        listen.textContent='🔊 听发音';
+        listen.onclick=()=>{
+            if (!speakText(item.english,'en-US')) feedback.textContent='当前设备没有可用的系统 TTS。';
+            else feedback.textContent='🔊 正在播放……';
+        };
+        box.appendChild(listen);
+
+        const next=document.createElement('button');
+        next.type='button';
+        next.className='sq-next';
+        next.textContent='↻ 换一个';
+        next.onclick=()=>buildLearn(root,sources());
+        box.appendChild(next);
+    }
+
+    function buildWord(root,listArg) {
+        const list=listArg || sources();
+        const englishItems=list.flatMap(item => {
+            const words=[...new Set((item.line.match(/[A-Za-z]{3,}/g)||[]).map(x=>x.toLowerCase()))];
+            return words.map(word=>({word,speaker:item.speaker,line:item.line}));
+        });
+        if (!englishItems.length) {
+            root.querySelector('.sq-empty').hidden=false;
+            root.querySelector('.sq-card').hidden=true;
+            root.querySelector('.sq-game-menu').hidden=true;
+            root.querySelector('.sq-status').textContent='找到剧情了，但暂时没有英文单词。';
+            return;
+        }
+        const target=englishItems[Math.floor(Math.random()*englishItems.length)];
+        const pool=[...new Set(englishItems.map(x=>x.word))];
+        const fallback=['story','quiet','little','really','always','maybe','think','look','want','come'];
+        for (const word of fallback) if (!pool.includes(word)) pool.push(word);
+        const distractors=pool.filter(x=>x!==target.word).sort(()=>Math.random()-.5).slice(0,2);
+        const choices=[target.word,...distractors];
+
+        root.querySelector('.sq-empty').hidden=true;
+        root.querySelector('.sq-game-menu').hidden=true;
+        root.querySelector('.sq-card').hidden=false;
         root.querySelector('.sq-label').textContent='WORD HUNT';
+        root.querySelector('.sq-status').textContent='从最近剧情里抓一个英文单词。';
         root.querySelector('.sq-prompt').textContent='哪个单词藏在这句里？\\n\\n“'+target.line+'”';
-        renderChoices(root,choices,answer,'抓到了！','答案是 '+answer+'。');
+        renderChoices(root,choices,target.word,'抓到了！','答案是 '+target.word+'。');
     }
 
     function renderChoices(root,choices,answer,okText,badText) {
@@ -413,7 +516,7 @@ export default 'SideQuest';
                 </div>
                 <div class="sq-settings" hidden>
                     <h3>SideQuest 设置</h3>
-                    <p>素材来源在这里设置；具体小游戏以后可以直接在窗口里选择。</p>
+                    <p>素材来源在这里设置；学习和小游戏都直接在窗口里选择；设置只负责素材来源和外观。</p>
                     <details class="sq-details">
                         <summary>题目素材</summary>
                         <div class="sq-details-body">
