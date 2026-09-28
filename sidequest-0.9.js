@@ -84,6 +84,21 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-empty-title { font-weight:750; font-size:16px; }
         #${PANEL_ID} .sq-empty p { font-size:12px; line-height:1.6; opacity:.58; }
         #${PANEL_ID} .sq-game-menu { display:grid; gap:10px; }
+        #${PANEL_ID} .sq-game-menu[hidden],
+        #${PANEL_ID} .sq-card[hidden],
+        #${PANEL_ID} .sq-empty[hidden],
+        #${PANEL_ID} .sq-settings[hidden] { display:none !important; }
+        #${PANEL_ID} .sq-door {
+            position:absolute; left:10px; bottom:10px; z-index:4;
+            width:26px; height:26px; padding:0; border:0; border-radius:50%;
+            background:rgba(255,255,255,.045); color:#fff !important; opacity:.28;
+            font-size:13px; cursor:pointer;
+        }
+        #${PANEL_ID} .sq-door:active { opacity:.7; transform:scale(.94); }
+        #${PANEL_ID} .sq-learn-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+        #${PANEL_ID} .sq-learn-actions .sq-option { text-align:center; }
+        #${PANEL_ID} .sq-source { margin-top:9px; font-size:9px; opacity:.38; line-height:1.45; }
+        #${PANEL_ID} .sq-record-note { margin-top:10px; padding:9px 10px; border-radius:10px; background:rgba(255,255,255,.035); font-size:10px; line-height:1.5; opacity:.58; }
         #${PANEL_ID} .sq-game-choice {
             width:100%; display:flex; align-items:center; gap:12px; box-sizing:border-box;
             padding:13px 12px; text-align:left; border:1px solid rgba(255,255,255,.10);
