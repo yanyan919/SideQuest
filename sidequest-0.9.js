@@ -80,6 +80,19 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-empty-icon { font-size:34px; margin-bottom:9px; }
         #${PANEL_ID} .sq-empty-title { font-weight:750; font-size:16px; }
         #${PANEL_ID} .sq-empty p { font-size:12px; line-height:1.6; opacity:.58; }
+        #${PANEL_ID} .sq-game-menu { display:grid; gap:10px; }
+        #${PANEL_ID} .sq-game-choice {
+            width:100%; display:flex; align-items:center; gap:12px; box-sizing:border-box;
+            padding:13px 12px; text-align:left; border:1px solid rgba(255,255,255,.10);
+            border-radius:15px; background:rgba(255,255,255,.055); color:#f2f2f2 !important;
+            cursor:pointer; font:inherit;
+        }
+        #${PANEL_ID} .sq-game-choice:active { transform:scale(.99); }
+        #${PANEL_ID} .sq-game-choice .sq-game-emoji { width:34px; text-align:center; font-size:24px; flex:none; }
+        #${PANEL_ID} .sq-game-choice span:nth-child(2) { min-width:0; flex:1; }
+        #${PANEL_ID} .sq-game-choice b { display:block; font-size:13px; }
+        #${PANEL_ID} .sq-game-choice small { display:block; margin-top:4px; font-size:10px; opacity:.52; line-height:1.4; }
+        #${PANEL_ID} .sq-game-choice em { display:inline-block; margin-top:5px; font-size:9px; font-style:normal; opacity:.4; }
         #${PANEL_ID} .sq-card {
             padding:15px; border:1px solid rgba(255,255,255,.09);
             border-radius:16px; background:rgba(255,255,255,.045);
@@ -210,23 +223,91 @@ export default 'SideQuest';
         handle.addEventListener('pointercancel', stop);
     }
 
+    let sideQuestListenersBound = false;
+
+    function refreshOpenGame() {
+        const panel=document.getElementById(PANEL_ID);
+        if (!panel || panel.classList.contains('sq-hidden')) return;
+        if (panel.querySelector('.sq-settings')?.hidden === false) return;
+        const mode=panel.dataset.sqGame || 'menu';
+        if (mode === 'word') buildWord(panel);
+        else buildGame(panel);
+    }
+
+    function bindStoryListeners() {
+        if (sideQuestListenersBound) return;
+        sideQuestListenersBound=true;
+
+        const source=globalThis.eventSource;
+        const types=globalThis.event_types || {};
+        const names=[
+            types.MESSAGE_RECEIVED, types.MESSAGE_SENT, types.MESSAGE_SWIPED,
+            types.MESSAGE_UPDATED, types.CHAT_CHANGED,
+            'MESSAGE_RECEIVED','MESSAGE_SENT','MESSAGE_SWIPED','MESSAGE_UPDATED','CHAT_CHANGED'
+        ].filter(Boolean);
+
+        if (source?.on) {
+            [...new Set(names)].forEach(name=>{
+                try { source.on(name, refreshOpenGame); } catch {}
+            });
+        }
+
+        let lastSignature='';
+        setInterval(()=>{
+            const list=chatMessages();
+            const signature=list.slice(-8).map(m=>String(m.mes||'')).join('\u0001');
+            if (signature !== lastSignature) {
+                lastSignature=signature;
+                refreshOpenGame();
+            }
+        },1200);
+    }
+
     function buildGame(root) {
         const list=sources();
         const empty=root.querySelector('.sq-empty');
         const card=root.querySelector('.sq-card');
+        const menu=root.querySelector('.sq-game-menu');
         const status=root.querySelector('.sq-status');
-        const s=loadSettings();
-        // Game selection will live in the window, not in settings.
-        // Until the first new game is added, keep the empty state visible.
         if (!list.length) {
-            empty.hidden=false; card.hidden=true;
+            empty.hidden=false; card.hidden=true; menu.hidden=true;
             status.textContent='还没有找到可出题的剧情内容。';
             return;
         }
 
-        empty.hidden=false;
+        empty.hidden=true;
         card.hidden=true;
-        status.textContent='素材已经准备好了，下一步就在这里挑小游戏。';
+        menu.hidden=false;
+        status.textContent='从最近的剧情里挑一个小游戏。';
+
+        menu.innerHTML=\`
+            <button type="button" class="sq-game-choice" data-game="word">
+                <span class="sq-game-emoji">🔎</span>
+                <span><b>单词寻宝</b><small>从刚才的剧情里抓一个英文单词</small></span>
+            </button>
+            <button type="button" class="sq-game-choice" data-game="speaker">
+                <span class="sq-game-emoji">💬</span>
+                <span><b>谁说的？</b><small>看一句话，猜它是谁说的</small><em>准备中</em></span>
+            </button>
+            <button type="button" class="sq-game-choice" data-game="meaning">
+                <span class="sq-game-emoji">🧩</span>
+                <span><b>情境猜意</b><small>根据上下文猜这个词是什么意思</small><em>准备中</em></span>
+            </button>
+            <button type="button" class="sq-game-choice" data-game="rebuild">
+                <span class="sq-game-emoji">🪄</span>
+                <span><b>句子拼图</b><small>把剧情里的句子重新拼起来</small><em>准备中</em></span>
+            </button>
+        \`;
+
+        menu.querySelectorAll('[data-game]').forEach(button=>{
+            button.onclick=()=>{
+                const game=button.dataset.game;
+                if (game !== 'word') return;
+                root.dataset.sqGame='word';
+                root.querySelector('.sq-game-menu').hidden=true;
+                buildWord(root,list);
+            };
+        });
     }
 
     function buildWord(root,listArg) {
@@ -321,7 +402,8 @@ export default 'SideQuest';
             </div>
             <div class="sq-body">
                 <div class="sq-status">准备中……</div>
-                <div class="sq-empty"><div class="sq-empty-icon">✨</div><div class="sq-empty-title">你的小支线</div><p>它会从最近的 RP 里捡一点内容，变成小游戏。游戏种类可以在设置里开关。</p></div>
+                <div class="sq-empty"><div class="sq-empty-icon">✨</div><div class="sq-empty-title">你的小支线</div><p>它会从最近的 RP 里捡一点内容，变成小游戏。</p></div>
+                <div class="sq-game-menu" hidden></div>
                 <div class="sq-card" hidden>
                     <div class="sq-label"></div>
                     <div class="sq-prompt"></div>
@@ -400,7 +482,10 @@ export default 'SideQuest';
         };
         panel.querySelector('[data-act="settings"]').onclick=showSettings;
         panel.querySelector('.sq-back').onclick=back;
-        panel.querySelector('.sq-next').onclick=()=>buildGame(panel);
+        panel.querySelector('.sq-next').onclick=()=>{
+            panel.dataset.sqGame='menu';
+            buildGame(panel);
+        };
 
         panel.querySelectorAll('[data-key]').forEach(input=>{
             const key=input.dataset.key;
@@ -562,10 +647,12 @@ export default 'SideQuest';
             if (oldDiagnostic) oldDiagnostic.remove();
 
             try {
+                panel.dataset.sqGame='menu';
                 buildGame(panel);
             } catch(error) {
                 console.error('[SideQuest] buildGame failed',error);
                 panel.querySelector('.sq-empty').hidden=false;
+                panel.querySelector('.sq-game-menu').hidden=true;
                 panel.querySelector('.sq-card').hidden=true;
                 panel.querySelector('.sq-settings').hidden=true;
                 panel.querySelector('.sq-status').textContent='窗口已打开，但这套 ST 的聊天数据暂时无法读取。';
@@ -735,6 +822,7 @@ export default 'SideQuest';
                 context.saveSettingsDebounced?.();
             }
             ensureFloatingUI();
+            bindStoryListeners();
             syncSettingsAndUI();
         } catch(error) {
             console.error('[SideQuest] boot failed',error);
