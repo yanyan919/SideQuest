@@ -12,7 +12,7 @@ export default 'SideQuest';
     const DEFAULTS = {
         enabled: true,
         includeCharacter: true,
-        includeNarration: false,
+        includeNarration: true,
         backgroundUrl: '',
         learningRecord: true,
         mistakeBook: true,
@@ -650,7 +650,7 @@ export default 'SideQuest';
         panel.innerHTML=`
             <div class="sq-head">
                 <div><span class="sq-title">SideQuest</span><span class="sq-sub">边等剧情，偷偷玩一下</span></div>
-                <div class="sq-actions"><button class="sq-icon" data-act="settings" title="设置">⚙</button><button class="sq-icon" data-act="close" title="关闭">×</button></div>
+                <div class="sq-actions"><button class="sq-icon" data-act="settings" title="设置">⚙</button><button class="sq-icon" data-act="exit" title="退出 SideQuest">🚪</button><button class="sq-icon" data-act="close" title="返回/关闭">×</button></div>
             </div>
             <div class="sq-body">
                 <div class="sq-status">准备中……</div>
@@ -664,12 +664,12 @@ export default 'SideQuest';
                 </div>
                 <div class="sq-settings" hidden>
                     <h3>SideQuest 设置</h3>
-                    <p>素材来源在这里设置；学习和小游戏都直接在窗口里选择；设置只负责素材来源和外观。</p>
+                    <p>只读取 AI/角色回复正文；你的消息不会进入素材池。这里可以选择抓取对白或 AI 回复里的旁白。</p>
                     <details class="sq-details">
                         <summary>题目素材</summary>
                         <div class="sq-details-body">
                             <label class="sq-setting-row"><input type="checkbox" data-key="includeCharacter"><span>角色对白</span></label>
-                            <label class="sq-setting-row"><input type="checkbox" data-key="includeNarration"><span>旁白</span></label>
+                            <label class="sq-setting-row"><input type="checkbox" data-key="includeNarration"><span>AI 回复里的旁白</span></label>
                         </div>
                     </details>
                     <details class="sq-details">
@@ -742,6 +742,13 @@ export default 'SideQuest';
                 return;
             }
             closePanel();
+        };
+        const exitButton=panel.querySelector('[data-act="exit"]');
+        exitButton.addEventListener('pointerup',e=>{
+            e.preventDefault(); e.stopPropagation(); closePanel();
+        });
+        exitButton.onclick=e=>{
+            e.preventDefault(); e.stopPropagation(); closePanel();
         };
         const closeButton=panel.querySelector('[data-act="close"]');
         closeButton.addEventListener('pointerup',e=>{
@@ -1021,7 +1028,6 @@ export default 'SideQuest';
                 <details class="sq-details">
                     <summary>题目素材</summary>
                     <div class="sq-details-body">
-                        <label class="checkbox_label"><input type="checkbox" data-sq="includeUser"><span>我的对白</span></label>
                         <label class="checkbox_label"><input type="checkbox" data-sq="includeCharacter"><span>角色对白</span></label>
                         <label class="checkbox_label"><input type="checkbox" data-sq="includeNarration"><span>旁白</span></label>
                     </div>
