@@ -264,6 +264,37 @@ export default 'SideQuest';
         });
     }
 
+    function applyMobileGeometry(panel) {
+        if (!panel) return;
+        const vv=window.visualViewport;
+        const vw=Math.max(280,Math.round(vv?.width||window.innerWidth||360));
+        const vh=Math.max(360,Math.round(vv?.height||window.innerHeight||640));
+        const cs=getComputedStyle(document.documentElement);
+        const insetTop=parseFloat(cs.getPropertyValue('--tt-inset-top'))||0;
+        const insetBottom=parseFloat(cs.getPropertyValue('--tt-inset-bottom'))||0;
+        const margin=12;
+        const width=Math.max(280,Math.min(360,vw-margin*2));
+        const height=Math.max(300,Math.min(590,vh-insetTop-insetBottom-24));
+        panel.style.setProperty('position','fixed','important');
+        panel.style.setProperty('transform','none','important');
+        panel.style.setProperty('perspective','none','important');
+        panel.style.setProperty('box-sizing','border-box','important');
+        panel.style.setProperty('width',width+'px','important');
+        panel.style.setProperty('max-width',width+'px','important');
+        panel.style.setProperty('height',height+'px','important');
+        panel.style.setProperty('max-height',height+'px','important');
+        panel.style.setProperty('min-height','0','important');
+        const r=panel.getBoundingClientRect();
+        const currentLeft=parseFloat(panel.style.left);
+        const currentTop=parseFloat(panel.style.top);
+        const left=Math.max(margin,Math.min(vw-r.width-margin,Number.isFinite(currentLeft)?currentLeft:vw-r.width-margin));
+        const top=Math.max(insetTop+margin,Math.min(vh-insetBottom-r.height-margin,Number.isFinite(currentTop)?currentTop:vh-insetBottom-r.height-margin));
+        panel.style.setProperty('left',left+'px','important');
+        panel.style.setProperty('top',top+'px','important');
+        panel.style.setProperty('right','auto','important');
+        panel.style.setProperty('bottom','auto','important');
+    }
+
     function applyPanelBackground(panel) {
         if (!panel) return;
         const url=String(loadSettings().backgroundUrl||'').trim();
@@ -518,24 +549,14 @@ export default 'SideQuest';
             // Diagnostic step 2: use the REAL SideQuest panel, but temporarily
             // strip it down to the same simple kind of floating box that HELLO proved
             // the native/self-hosted ST can paint. Nothing inside the panel is deleted.
-            panel.style.setProperty('left','20px','important');
-            panel.style.setProperty('top','20px','important');
-            panel.style.setProperty('right','auto','important');
-            panel.style.setProperty('bottom','auto','important');
-            panel.style.setProperty('width','300px','important');
-            panel.style.setProperty('height','320px','important');
-            panel.style.setProperty('min-height','0','important');
+            // Keep the proven simple outer shell, but let the mobile
+            // geometry guard calculate its real viewport size and position.
             panel.style.setProperty('display','block','important');
             panel.style.setProperty('overflow','auto','important');
-            panel.style.setProperty('box-sizing','border-box','important');
-            panel.style.setProperty('background','rgba(40,40,45,.98)','important');
-            panel.style.setProperty('backdrop-filter','none','important');
-            panel.style.setProperty('-webkit-backdrop-filter','none','important');
-            panel.style.setProperty('transform','none','important');
             panel.style.setProperty('isolation','isolate','important');
-            panel.style.setProperty('border','3px solid #fff','important');
             panel.style.setProperty('border-radius','16px','important');
             panel.style.setProperty('box-shadow','0 12px 40px rgba(0,0,0,.5)','important');
+            applyMobileGeometry(panel);
 
             const oldDiagnostic=document.getElementById('sidequest-diagnostic-v9');
             if (oldDiagnostic) oldDiagnostic.remove();
@@ -605,6 +626,10 @@ export default 'SideQuest';
         clampPosition();
 
         window.addEventListener('resize',clampPosition,{passive:true});
+        window.visualViewport?.addEventListener('resize',()=>{
+            const panel=document.getElementById(PANEL_ID);
+            if(panel && !panel.classList.contains('sq-hidden')) applyMobileGeometry(panel);
+        },{passive:true});
         return root;
     }
 
