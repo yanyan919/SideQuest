@@ -511,8 +511,39 @@ export default 'SideQuest';
             panel.style.setProperty('opacity','1','important');
 
             const fabRoot=document.getElementById('sidequest-root-v9');
+            const fabOrb=document.getElementById(FAB_ID);
             if (fabRoot) fabRoot.style.setProperty('display','block','important');
             if (fabOrb) fabOrb.style.setProperty('display','none','important');
+
+            // Diagnostic only: keep the real SideQuest window untouched.
+            // If the native/self-hosted ST cannot paint this top-level element,
+            // the problem is outside the game's panel structure.
+            let diagnostic=document.getElementById('sidequest-diagnostic-v9');
+            if (!diagnostic) {
+                diagnostic=document.createElement('div');
+                diagnostic.id='sidequest-diagnostic-v9';
+                diagnostic.textContent='HELLO · SideQuest 浮层测试';
+                diagnostic.style.cssText=[
+                    'position:fixed !important',
+                    'left:20px !important',
+                    'top:20px !important',
+                    'width:280px !important',
+                    'height:110px !important',
+                    'z-index:2147483647 !important',
+                    'display:flex !important',
+                    'align-items:center !important',
+                    'justify-content:center !important',
+                    'box-sizing:border-box !important',
+                    'background:#c62828 !important',
+                    'color:#fff !important',
+                    'font-size:18px !important',
+                    'font-weight:800 !important',
+                    'border:3px solid #fff !important',
+                    'border-radius:16px !important',
+                    'box-shadow:0 12px 40px rgba(0,0,0,.5) !important'
+                ].join(';');
+                (document.body || document.documentElement).appendChild(diagnostic);
+            }
 
             try {
                 buildGame(panel);
