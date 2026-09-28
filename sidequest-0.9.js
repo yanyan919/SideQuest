@@ -898,10 +898,17 @@ export default 'SideQuest';
             applyMobileGeometry(panel);
 
             try {
+                const currentChat=chatKey();
+                if(panel.dataset.sqChatKey && panel.dataset.sqChatKey!==currentChat){
+                    panel.dataset.sqInitialized='';
+                    panel.dataset.sqGame='menu';
+                    panel.querySelector('.sq-settings').hidden=true;
+                }
                 if(panel.dataset.sqInitialized!=='1'){
                     panel.dataset.sqGame='menu';
                     buildGame(panel);
                     panel.dataset.sqInitialized='1';
+                    panel.dataset.sqChatKey=currentChat;
                 }
             } catch(error) {
                 console.error('[SideQuest] buildGame failed',error);
