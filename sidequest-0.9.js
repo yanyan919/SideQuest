@@ -532,7 +532,7 @@ export default 'SideQuest';
         const speak=document.createElement('button'); speak.type='button'; speak.className='sq-inline-speak'; speak.textContent='🔊'; speak.title='听发音'; speak.setAttribute('aria-label','听发音'); speak.onclick=()=>speakText(item.english,'en-US'); row.appendChild(speak);
         prompt.innerHTML=''; prompt.appendChild(row);
 
-        const meaning=document.createElement('div'); meaning.className='sq-translation'; meaning.textContent=item.translation; prompt.appendChild(meaning);
+        const meaning=document.createElement('div'); meaning.className='sq-meaning'; meaning.textContent=item.translation; prompt.appendChild(meaning);
 
         const actions=document.createElement('div'); actions.className='sq-learn-actions';
         const learned=document.createElement('button'); learned.type='button'; learned.className='sq-option'; learned.textContent='✓ 会了';
@@ -542,7 +542,6 @@ export default 'SideQuest';
         actions.appendChild(learned); actions.appendChild(notYet);
         box.appendChild(actions);
 
-        const source=document.createElement('div'); source.className='sq-source'; source.textContent='来自：'+item.speaker; box.appendChild(source);
     }
 
     function buildWord(root,listArg) {
