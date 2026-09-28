@@ -607,9 +607,6 @@ export default 'SideQuest';
         }
 
         const context=document.createElement('div'); context.className='sq-context'; context.textContent='来自：'+target.speaker; box.appendChild(context);
-        const door=document.createElement('button'); door.type='button'; door.className='sq-door'; door.textContent='🚪'; door.title='回到选择';
-        door.onclick=()=>{ root.dataset.sqGame='menu'; buildGame(root); };
-        card.appendChild(door);
     }
 
     function renderChoices(root,choices,answer,okText,badText,item) {
@@ -1329,9 +1326,6 @@ export default 'SideQuest';
         const context=document.createElement('div'); context.className='sq-context'; context.textContent='原句：'+item.source; box.appendChild(context);
         const source=document.createElement('div'); source.className='sq-source'; source.textContent='来自：'+item.speaker; box.appendChild(source);
 
-        const door=document.createElement('button'); door.type='button'; door.className='sq-door'; door.textContent='🚪'; door.title='回到选择';
-        door.onclick=()=>{ root.dataset.sqGame='menu'; buildGame(root); };
-        card.appendChild(door);
     }
 
     function buildWord(root,listArg) {
