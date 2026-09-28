@@ -375,48 +375,11 @@ export default 'SideQuest';
         return result;
     }
 
-    function addStyle    function addStyle');
-
-        for(const message of chatMessages()){
-            if(message.is_user) continue;
-            const speaker=String(message.name||message.ch_name||'Character').trim()||'Character';
-            let raw=clean(message.mes);
-            if(!raw) continue;
-
-            // *xxx* 是内心话，不是对白。
-            raw=clean(raw.replace(/\*[\s\S]*?\*/g,' '));
-            if(!raw) continue;
-
-            const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
-            const text=lines.join('\n');
-            const explicitPrefix=/^([^:：\n]{1,40})[:：]\s*(.+)$/;
-            const dialogueRanges=[];
-            const addDialogue=line=>{ if(s.includeCharacter) pushUnique(speaker,line,'dialogue'); };
-            const isUserSpeaker=name=>{
-                const n=String(name||'').trim().toLowerCase();
-                return userNames.has(n) || n==='{{user}}';
-            };
-
-            for(const line of lines){
-                const m=explicitPrefix.exec(line);
-                if(m && /[A-Za-z]{2,}/.test(m[2])){
-                    if(isUserSpeaker(m[1])) continue;
-                    if(s.includeCharacter) pushUnique(m[1].trim()||speaker,m[2],'dialogue');
-                    const pos=text.indexOf(line);
-                    if(pos>=0) dialogueRanges.push([pos,pos+line.length]);
-                }
-            }
-
-            const quoteRe=/[“「『"]([\s\S]{4,260}?)[”」』"]/g;
-            let match;
-            while((match=quoteRe.exec(text))){
-                const before=text.slice(Math.max(0,match.index-70),match.index);
-                const userPrefix=/((?:^|[\s])(?:you|user)\s*[:：]\s*)$/i.test(before);
-                const namedUser=userName && new RegExp('(?:^|[\\s“「『])'+escapeRegExp(userName)+'\\s*[:：]?\\s*() {
+    function addStyle() {
         if (document.getElementById('sidequest-style-v9')) return;
-        const style = document.createElement('style');
-        style.id = 'sidequest-style-v9';
-        style.textContent = css;
+        const style=document.createElement('style');
+        style.id='sidequest-style-v9';
+        style.textContent=css;
         document.head?.appendChild(style);
     }
 
