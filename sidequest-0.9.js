@@ -169,16 +169,78 @@ export default 'SideQuest';
         }
     `;
 
-    function loadSettings() {
+    const PROFILES_KEY='sidequest_v9_profiles';
+    const ACTIVE_PROFILE_KEY='sidequest_v9_active_profile';
+    const DEFAULT_PROFILE_ID='profile-1';
+
+    function loadProfiles() {
         try {
-            return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
-        } catch {
-            return { ...DEFAULTS };
-        }
+            const raw=JSON.parse(localStorage.getItem(PROFILES_KEY)||'null');
+            if(raw && Array.isArray(raw.profiles) && raw.profiles.length) return raw;
+        } catch {}
+        let legacy={};
+        try { legacy=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); } catch {}
+        const initial={profiles:[{id:DEFAULT_PROFILE_ID,name:'学习档案 1',settings:{...DEFAULTS,...legacy}}]};
+        try { localStorage.setItem(PROFILES_KEY,JSON.stringify(initial)); } catch {}
+        try { localStorage.setItem(ACTIVE_PROFILE_KEY,DEFAULT_PROFILE_ID); } catch {}
+        return initial;
+    }
+
+    function activeProfileId() {
+        const data=loadProfiles();
+        const id=localStorage.getItem(ACTIVE_PROFILE_KEY)||DEFAULT_PROFILE_ID;
+        return data.profiles.some(p=>p.id===id)?id:data.profiles[0].id;
+    }
+
+    function activeProfile() {
+        const data=loadProfiles();
+        return data.profiles.find(p=>p.id===activeProfileId())||data.profiles[0];
+    }
+
+    function loadSettings() {
+        try { return { ...DEFAULTS, ...(activeProfile()?.settings||{}) }; }
+        catch { return { ...DEFAULTS }; }
     }
 
     function saveSettings(settings) {
-        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+        try {
+            const data=loadProfiles();
+            const id=activeProfileId();
+            const profile=data.profiles.find(p=>p.id===id);
+            if(profile) profile.settings={...DEFAULTS,...settings};
+            localStorage.setItem(PROFILES_KEY,JSON.stringify(data));
+            localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));
+        } catch {}
+    }
+
+    function createProfile() {
+        const data=loadProfiles();
+        if(data.profiles.length>=3) return null;
+        const n=data.profiles.length+1;
+        const id='profile-'+Date.now().toString(36);
+        const profile={id,name:'学习档案 '+n,settings:{...DEFAULTS}};
+        data.profiles.push(profile);
+        try {
+            localStorage.setItem(PROFILES_KEY,JSON.stringify(data));
+            localStorage.setItem(ACTIVE_PROFILE_KEY,id);
+        } catch {}
+        return profile;
+    }
+
+    function renameActiveProfile(name) {
+        const value=String(name||'').trim().slice(0,32);
+        if(!value) return false;
+        const data=loadProfiles();
+        const profile=data.profiles.find(p=>p.id===activeProfileId());
+        if(!profile) return false;
+        profile.name=value;
+        try { localStorage.setItem(PROFILES_KEY,JSON.stringify(data)); return true; } catch { return false; }
+    }
+
+    function switchActiveProfile(id) {
+        const data=loadProfiles();
+        if(!data.profiles.some(p=>p.id===id)) return false;
+        try { localStorage.setItem(ACTIVE_PROFILE_KEY,id); return true; } catch { return false; }
     }
 
     function ctx() {
@@ -252,7 +314,10 @@ export default 'SideQuest';
     function loadRecords() {
         try {
             const raw=JSON.parse(localStorage.getItem(RECORDS_KEY)||'{}');
-            return { learned:Array.isArray(raw.learned)?raw.learned:[], mistakes:Array.isArray(raw.mistakes)?raw.mistakes:[] };
+            const records={ learned:Array.isArray(raw.learned)?raw.learned:[], mistakes:Array.isArray(raw.mistakes)?raw.mistakes:[] };
+            // Existing records are migrated into the first profile without deleting them.
+            for(const list of [records.learned,records.mistakes]) for(const item of list) if(!item.profile) item.profile=DEFAULT_PROFILE_ID;
+            return records;
         } catch { return { learned:[], mistakes:[] }; }
     }
 
@@ -271,7 +336,7 @@ export default 'SideQuest';
     function hasLearned(item) {
         if (!loadSettings().learningRecord) return false;
         const key=recordKey(item);
-        return loadRecords().learned.some(x=>x.chat===chatKey() && x.key===key);
+        return loadRecords().learned.some(x=>x.profile===activeProfileId() && x.chat===chatKey() && x.key===key);
     }
 
     function markLearned(item) {
@@ -279,8 +344,8 @@ export default 'SideQuest';
         if (!s.learningRecord) return;
         const records=loadRecords();
         const key=recordKey(item);
-        records.learned=records.learned.filter(x=>!(x.chat===chatKey() && x.key===key));
-        records.learned.push({chat:chatKey(),key,english:item.english||item.word,translation:item.translation||'',time:Date.now()});
+        records.learned=records.learned.filter(x=>!(x.profile===activeProfileId() && x.chat===chatKey() && x.key===key));
+        records.learned.push({profile:activeProfileId(),chat:chatKey(),key,english:item.english||item.word,translation:item.translation||'',time:Date.now()});
         saveRecords(records);
     }
 
@@ -289,8 +354,8 @@ export default 'SideQuest';
         if (!s.mistakeBook) return;
         const records=loadRecords();
         const key=recordKey(item);
-        records.mistakes=records.mistakes.filter(x=>!(x.chat===chatKey() && x.key===key));
-        records.mistakes.push({chat:chatKey(),key,english:item.english||item.word,translation:item.translation||'',wrong:String(answer||''),time:Date.now()});
+        records.mistakes=records.mistakes.filter(x=>!(x.profile===activeProfileId() && x.chat===chatKey() && x.key===key));
+        records.mistakes.push({profile:activeProfileId(),chat:chatKey(),key,english:item.english||item.word,translation:item.translation||'',wrong:String(answer||''),time:Date.now()});
         saveRecords(records);
     }
 
