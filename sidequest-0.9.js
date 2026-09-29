@@ -17,6 +17,7 @@ export default 'SideQuest';
         learningRecord: true,
         mistakeBook: true,
         repeatLearned: false,
+        translationMode: 'english',
     };
 
     const css = `
@@ -291,14 +292,62 @@ export default 'SideQuest';
         return out;
     }
 
+    const TRANSLATION_CACHE_KEY='sidequest_v9_translation_cache';
+
+    function loadTranslationCache() {
+        try { const value=JSON.parse(localStorage.getItem(TRANSLATION_CACHE_KEY)||'{}'); return value && typeof value==='object' ? value : {}; }
+        catch { return {}; }
+    }
+
+    function chineseText(value) {
+        const text=String(value||'').trim();
+        return /[\u3400-\u9fff]/.test(text) && !/[A-Za-z]{3,}/.test(text);
+    }
+
     function learningItems(list) {
         const items=[];
+        const cache=loadTranslationCache();
+        const mode=loadSettings().translationMode||'english';
         for(const item of list){
-            for(const pair of englishPairs(item.line)){
-                items.push({...pair,speaker:item.speaker,source:item.line,kind:item.kind});
+            const pairs=englishPairs(item.line);
+            for(const pair of pairs){
+                if(mode!=='chinese') items.push({...pair,speaker:item.speaker,source:item.line,kind:item.kind,origin:'existing'});
+            }
+            const translated=cache[item.line];
+            if(mode!=='english' && translated && chineseText(item.line)){
+                items.push({english:translated,translation:item.line,speaker:item.speaker,source:item.line,kind:item.kind,origin:'translated'});
             }
         }
         return items;
+    }
+
+    let translationJobRunning=false;
+    async function translateChineseSources() {
+        const mode=loadSettings().translationMode||'english';
+        if(mode==='english' || translationJobRunning) return;
+        const list=sources();
+        const cache=loadTranslationCache();
+        const pending=[...new Set(list.map(x=>x.line).filter(line=>chineseText(line) && !cache[line]))].slice(0,8);
+        if(!pending.length) return;
+        translationJobRunning=true;
+        try {
+            for(const line of pending){
+                try {
+                    const url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(line.slice(0,450))+'&langpair=zh-CN|en-US';
+                    const response=await fetch(url,{method:'GET'});
+                    if(!response.ok) continue;
+                    const data=await response.json();
+                    const translated=String(data?.responseData?.translatedText||'').trim();
+                    if(translated && !/[\u3400-\u9fff]{2}/.test(translated) && translated.toLowerCase()!==line.toLowerCase()){
+                        cache[line]=translated;
+                        try { localStorage.setItem(TRANSLATION_CACHE_KEY,JSON.stringify(cache)); } catch {}
+                    }
+                } catch(error) { console.warn('[SideQuest] translation request failed',error); }
+            }
+        } finally {
+            translationJobRunning=false;
+            refreshOpenGame();
+        }
     }
 
 
@@ -514,6 +563,7 @@ export default 'SideQuest';
 
     function buildGame(root) {
         const list=sources();
+        if((loadSettings().translationMode||'english')!=='english') translateChineseSources();
         const empty=root.querySelector('.sq-empty');
         const card=root.querySelector('.sq-card');
         const menu=root.querySelector('.sq-game-menu');
@@ -572,6 +622,7 @@ export default 'SideQuest';
 
     function buildLearn(root,listArg) {
         const list=listArg||sources();
+        if((loadSettings().translationMode||'english')!=='english') translateChineseSources();
         let items=learningItems(list);
         const s=loadSettings();
         if(!s.repeatLearned && s.learningRecord) items=items.filter(x=>!hasLearned(x));
@@ -841,6 +892,18 @@ export default 'SideQuest';
                             <label class="sq-setting-row"><input type="checkbox" data-key="includeNarration"><span>AI 回复里的旁白</span></label>
                         </div>
                     </details>
+                    <details class="sq-details" open>
+                        <summary>语言模式与中文翻译</summary>
+                        <div class="sq-details-body">
+                            <label class="sq-setting-label">学习素材模式</label>
+                            <select class="sq-url-input" data-key="translationMode">
+                                <option value="english">英语模式：只用已有英文素材</option>
+                                <option value="chinese">中文模式：把 AI 的中文回复翻译成英语</option>
+                                <option value="mixed">混合模式：已有英文 + 中文翻译</option>
+                            </select>
+                            <div class="sq-note">中文翻译使用 MyMemory 在线翻译服务。选择中文/混合模式后，符合条件的 AI 中文回复片段会发送给该第三方服务翻译；翻译结果只缓存在本机浏览器中。服务可能限流或翻译不准确，用户消息不会被发送。</div>
+                        </div>
+                    </details>
                     <details class="sq-details">
                         <summary>学习记录</summary>
                         <div class="sq-details-body">
@@ -967,7 +1030,14 @@ export default 'SideQuest';
             const key=input.dataset.key;
             const update=()=>{
                 const s=loadSettings();
-                s[key]=input.type==='checkbox' ? input.checked : input.value.trim();
+                const value=input.type==='checkbox' ? input.checked : input.value.trim();
+                if(key==='translationMode' && value!=='english' && s.translationMode==='english'){
+                    if(!confirm('中文翻译需要把 AI 回复中的中文片段发送给 MyMemory 第三方在线翻译服务。不要切换到包含隐私信息的聊天内容。继续启用吗？')){
+                        input.value=s.translationMode;
+                        return;
+                    }
+                }
+                s[key]=value;
                 saveSettings(s);
                 applyPanelBackground(panel);
             };
@@ -1228,12 +1298,26 @@ export default 'SideQuest';
             </div>
             <div class="inline-drawer-content">
                 <label class="checkbox_label"><input type="checkbox" data-sq="enabled"><span>启用 SideQuest 悬浮窗</span></label>
+                <label class="sq-setting-label">当前学习档案</label>
+                <select class="sq-url-input" data-sq-profile></select>
                 <hr>
                 <details class="sq-details">
                     <summary>题目素材</summary>
                     <div class="sq-details-body">
                         <label class="checkbox_label"><input type="checkbox" data-sq="includeCharacter"><span>角色对白</span></label>
                         <label class="checkbox_label"><input type="checkbox" data-sq="includeNarration"><span>旁白</span></label>
+                    </div>
+                </details>
+                <details class="sq-details">
+                    <summary>语言模式与中文翻译</summary>
+                    <div class="sq-details-body">
+                        <label class="sq-setting-label">学习素材模式</label>
+                        <select class="sq-url-input" data-sq="translationMode">
+                            <option value="english">英语模式：只用已有英文素材</option>
+                            <option value="chinese">中文模式：把 AI 的中文回复翻译成英语</option>
+                            <option value="mixed">混合模式：已有英文 + 中文翻译</option>
+                        </select>
+                        <div class="sq-note">中文/混合模式会把符合条件的 AI 中文回复片段发送给 MyMemory 在线翻译服务；翻译结果缓存在本机浏览器。服务可能限流或翻译不准确，用户消息不会被发送。</div>
                     </div>
                 </details>
                 <details class="sq-details">
@@ -1247,13 +1331,50 @@ export default 'SideQuest';
             </div>`;
         container.appendChild(drawer);
 
+        const profileSelect=drawer.querySelector('[data-sq-profile]');
+        const syncDrawerProfile=()=>{
+            const data=loadProfiles();
+            profileSelect.innerHTML='';
+            data.profiles.forEach(p=>{
+                const option=document.createElement('option');
+                option.value=p.id; option.textContent=p.name; option.selected=p.id===activeProfileId();
+                profileSelect.appendChild(option);
+            });
+            const current=loadSettings();
+            drawer.querySelectorAll('[data-sq]').forEach(input=>{
+                const key=input.dataset.sq;
+                if(input.type==='checkbox') input.checked=!!current[key];
+                else input.value=String(current[key]||'');
+            });
+        };
+        profileSelect?.addEventListener('change',()=>{
+            if(!switchActiveProfile(profileSelect.value)) return;
+            syncDrawerProfile();
+            const current=loadSettings();
+            const contextNow=ctx();
+            if(contextNow?.extensionSettings){ contextNow.extensionSettings.sidequest={...DEFAULTS,...current}; contextNow.saveSettingsDebounced?.(); }
+            applyPanelBackground(document.getElementById(PANEL_ID));
+            const panel=document.getElementById(PANEL_ID);
+            if(panel && panel.querySelector('.sq-settings')?.hidden===false){
+                panel.querySelectorAll('[data-key]').forEach(i=>{ if(i.type==='checkbox') i.checked=!!current[i.dataset.key]; else i.value=String(current[i.dataset.key]||''); });
+                renderProfileControls(panel); renderRecordManager(panel);
+            }
+            refreshOpenGame();
+        });
         const current=loadSettings();
         drawer.querySelectorAll('[data-sq]').forEach(input=>{
             const key=input.dataset.sq;
             if (input.type==='checkbox') input.checked=!!current[key];
             else input.value=String(current[key]||'');
             const update=()=>{
-                current[key]=input.type==='checkbox' ? input.checked : input.value.trim();
+                const value=input.type==='checkbox' ? input.checked : input.value.trim();
+                if(key==='translationMode' && value!=='english' && current.translationMode==='english'){
+                    if(!confirm('中文翻译需要把 AI 回复中的中文片段发送给 MyMemory 第三方在线翻译服务。不要切换到包含隐私信息的聊天内容。继续启用吗？')){
+                        input.value=current.translationMode;
+                        return;
+                    }
+                }
+                current[key]=value;
                 saveSettings(current);
                 if (context?.extensionSettings?.sidequest) {
                     context.extensionSettings.sidequest[key]=current[key];
@@ -1268,6 +1389,7 @@ export default 'SideQuest';
             input.addEventListener(input.type==='checkbox' ? 'change' : 'input',update);
             input.addEventListener('change',update);
         });
+        syncDrawerProfile();
     }
 
     function syncSettingsAndUI() {
