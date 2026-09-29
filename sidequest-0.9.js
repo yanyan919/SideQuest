@@ -1038,7 +1038,10 @@ export default 'SideQuest';
                                 <label class="sq-setting-label">Fish Audio API Key</label>
                                 <input class="sq-url-input" type="password" autocomplete="off" data-secret="fishApiKey" placeholder="粘贴 Fish Audio API Key">
                                 <label class="sq-setting-label">模型</label>
-                                <input class="sq-url-input" type="text" data-key="fishModel" placeholder="s2.1-pro-free">
+                                <select class="sq-url-input" data-key="fishModel">
+                                    <option value="s2.1-pro-free">S2.1 Pro Free（默认）</option>
+                                    <option value="s2.1-pro">S2.1 Pro</option>
+                                </select>
                                 <label class="sq-setting-label">音色 ID（可选）</label>
                                 <input class="sq-url-input" type="text" data-key="fishReferenceId" placeholder="reference_id；留空使用服务默认音色">
                                 <button type="button" class="sq-mini-action" data-act="tts-test">测试 Fish Audio 连接并试听</button>
