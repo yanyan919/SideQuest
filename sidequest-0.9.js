@@ -301,7 +301,9 @@ export default 'SideQuest';
 
     function chineseText(value) {
         const text=String(value||'').trim();
-        return /[\u3400-\u9fff]/.test(text) && !/[A-Za-z]{3,}/.test(text);
+        // Translate Chinese-bearing source lines, including lines with occasional English.
+        // Skip lines that already contain an explicit English-Chinese pair.
+        return /[\\u3400-\\u9fff]/.test(text) && englishPairs(text).length===0;
     }
 
     function learningItems(list) {
@@ -337,9 +339,13 @@ export default 'SideQuest';
                     const response=await fetch(url,{method:'GET'});
                     if(!response.ok) continue;
                     const data=await response.json();
+                    if(Number(data?.responseStatus||200)!==200) continue;
                     const translated=String(data?.responseData?.translatedText||'').trim();
-                    if(translated && !/[\u3400-\u9fff]{2}/.test(translated) && translated.toLowerCase()!==line.toLowerCase()){
+                    if(translated && !/[\\u3400-\\u9fff]{2}/.test(translated) && translated.toLowerCase()!==line.toLowerCase()){
                         cache[line]=translated;
+                        // Keep the cache bounded so long-running chats stay lightweight.
+                        const keys=Object.keys(cache);
+                        for(const oldKey of keys.slice(0,Math.max(0,keys.length-300))) delete cache[oldKey];
                         try { localStorage.setItem(TRANSLATION_CACHE_KEY,JSON.stringify(cache)); } catch {}
                     }
                 } catch(error) { console.warn('[SideQuest] translation request failed',error); }
