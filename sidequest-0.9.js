@@ -1212,7 +1212,7 @@ export default 'SideQuest';
         const container=document.getElementById('extensions_settings2') || document.getElementById('extensions_settings');
         if (!container || document.getElementById(SETTINGS_ID)) return;
 
-        const settings=context?.extensionSettings?.sidequest ?? loadSettings();
+        const settings=loadSettings();
         if (context?.extensionSettings) {
             context.extensionSettings.sidequest={...DEFAULTS,...settings};
             context.saveSettingsDebounced?.();
@@ -1247,7 +1247,6 @@ export default 'SideQuest';
         container.appendChild(drawer);
 
         const current=loadSettings();
-        if (context?.extensionSettings?.sidequest) Object.assign(current,context.extensionSettings.sidequest);
         drawer.querySelectorAll('[data-sq]').forEach(input=>{
             const key=input.dataset.sq;
             if (input.type==='checkbox') input.checked=!!current[key];
@@ -1274,8 +1273,8 @@ export default 'SideQuest';
         const context=ctx();
         const saved=loadSettings();
         if (context?.extensionSettings) {
-            context.extensionSettings.sidequest={...saved,...(context.extensionSettings.sidequest||{})};
-            saveSettings(context.extensionSettings.sidequest);
+            context.extensionSettings.sidequest={...DEFAULTS,...saved};
+            context.saveSettingsDebounced?.();
         }
         renderExtensionSettings();
         if (context?.extensionSettings?.sidequest?.enabled===false || saved.enabled===false) {
