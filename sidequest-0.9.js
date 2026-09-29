@@ -707,6 +707,89 @@ export default 'SideQuest';
         }
     }
 
+    function renderProfileControls(panel) {
+        const select=panel.querySelector('[data-profile-select]');
+        const name=panel.querySelector('[data-profile-name]');
+        if(!select) return;
+        const data=loadProfiles();
+        select.innerHTML='';
+        for(const p of data.profiles){
+            const option=document.createElement('option');
+            option.value=p.id; option.textContent=p.name;
+            option.selected=p.id===activeProfileId();
+            select.appendChild(option);
+        }
+        if(name) name.value=activeProfile()?.name||'';
+        const create=panel.querySelector('[data-act="profile-create"]');
+        if(create) create.disabled=data.profiles.length>=3;
+        const note=panel.querySelector('[data-profile-note]');
+        if(note) note.textContent=data.profiles.length>=3?'最多创建 3 套档案。':'每套档案的设置、学习记录和错题本独立保存。';
+    }
+
+    function renderRecordManager(panel) {
+        const host=panel.querySelector('[data-record-manager]');
+        if(!host) return;
+        host.innerHTML='';
+        const records=loadRecords();
+        const profile=activeProfileId();
+        const learned=records.learned.filter(x=>x.profile===profile);
+        const mistakes=records.mistakes.filter(x=>x.profile===profile);
+        const makeSection=(title,items,type)=>{
+            const section=document.createElement('section');
+            section.style.cssText='margin:8px 0 14px;';
+            const heading=document.createElement('div');
+            heading.style.cssText='font-size:12px;font-weight:700;margin:8px 0;';
+            heading.textContent=title+'（'+items.length+'）';
+            section.appendChild(heading);
+            if(!items.length){
+                const empty=document.createElement('div');
+                empty.className='sq-note'; empty.textContent='这里还没有记录。'; section.appendChild(empty);
+            }
+            items.slice().reverse().forEach(item=>{
+                const row=document.createElement('div');
+                row.style.cssText='display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid rgba(255,255,255,.08);';
+                const content=document.createElement('div');
+                content.style.cssText='flex:1;min-width:0;font-size:11px;line-height:1.45;overflow-wrap:anywhere;';
+                const word=document.createElement('div');
+                word.style.fontWeight='700'; word.textContent=item.english||item.word||'（无英文内容）';
+                content.appendChild(word);
+                if(item.translation){
+                    const meaning=document.createElement('div');
+                    meaning.style.opacity='.7'; meaning.textContent=item.translation; content.appendChild(meaning);
+                }
+                if(type==='mistakes' && item.wrong){
+                    const wrong=document.createElement('div');
+                    wrong.style.opacity='.55'; wrong.textContent='你的答案：'+item.wrong; content.appendChild(wrong);
+                }
+                const date=document.createElement('div');
+                date.style.cssText='font-size:9px;opacity:.4;margin-top:3px;';
+                date.textContent=item.time?new Date(item.time).toLocaleString():'';
+                content.appendChild(date);
+                const del=document.createElement('button');
+                del.type='button'; del.className='sq-icon'; del.style.flex='0 0 30px'; del.textContent='删除'; del.title='删除这条记录';
+                del.style.width='42px'; del.style.borderRadius='8px'; del.style.fontSize='10px';
+                del.onclick=()=>{
+                    const latest=loadRecords();
+                    latest[type]=latest[type].filter(x=>!(x.profile===profile && x.time===item.time && x.key===item.key && (type!=='mistakes'||x.wrong===item.wrong)));
+                    saveRecords(latest); renderRecordManager(panel);
+                };
+                row.append(content,del); section.appendChild(row);
+            });
+            const clear=document.createElement('button');
+            clear.type='button'; clear.className='sq-mini-action'; clear.textContent='清空本档案的'+(type==='learned'?'学习记录':'错题本');
+            clear.onclick=()=>{
+                if(!confirm('确定清空本档案的'+(type==='learned'?'学习记录':'错题本')+'吗？此操作无法撤销。')) return;
+                const latest=loadRecords();
+                latest[type]=latest[type].filter(x=>x.profile!==profile);
+                saveRecords(latest); renderRecordManager(panel);
+            };
+            section.appendChild(clear);
+            host.appendChild(section);
+        };
+        makeSection('已学记录',learned,'learned');
+        makeSection('错题本',mistakes,'mistakes');
+    }
+
     function createPanel() {
         document.getElementById(PANEL_ID)?.remove();
         const panel=document.createElement('div');
@@ -730,6 +813,27 @@ export default 'SideQuest';
                 <div class="sq-settings" hidden>
                     <h3>SideQuest 设置</h3>
                     <p>只读取 AI/角色回复正文；你的消息不会进入素材池。这里可以选择抓取对白或 AI 回复里的旁白。</p>
+                    <details class="sq-details" open>
+                        <summary>学习档案</summary>
+                        <div class="sq-details-body">
+                            <label class="sq-setting-label">当前档案</label>
+                            <select data-profile-select class="sq-url-input"></select>
+                            <label class="sq-setting-label">档案名称</label>
+                            <input data-profile-name class="sq-url-input" maxlength="32" placeholder="给这套档案起名">
+                            <div style="display:flex;gap:8px;">
+                                <button type="button" class="sq-mini-action" data-act="profile-rename">保存名称</button>
+                                <button type="button" class="sq-mini-action" data-act="profile-create">新建档案</button>
+                            </div>
+                            <div class="sq-note" data-profile-note></div>
+                        </div>
+                    </details>
+                    <details class="sq-details">
+                        <summary>我的记录与错题本</summary>
+                        <div class="sq-details-body">
+                            <div class="sq-note">可以查看、逐条删除，或清空当前档案的记录。不同档案互不影响。</div>
+                            <div data-record-manager></div>
+                        </div>
+                    </details>
                     <details class="sq-details">
                         <summary>题目素材</summary>
                         <div class="sq-details-body">
@@ -778,6 +882,8 @@ export default 'SideQuest';
                 if (i.type==='checkbox') i.checked=!!s[i.dataset.key];
                 else i.value=String(s[i.dataset.key]||'');
             });
+            renderProfileControls(panel);
+            renderRecordManager(panel);
         };
         const back=()=>{
             settingsView.hidden=true;
@@ -823,6 +929,38 @@ export default 'SideQuest';
             e.preventDefault(); e.stopPropagation(); goUpOneLevel();
         };
         panel.querySelector('[data-act="settings"]').onclick=showSettings;
+
+        const profileSelect=panel.querySelector('[data-profile-select]');
+        profileSelect?.addEventListener('change',()=>{
+            if(!switchActiveProfile(profileSelect.value)) return;
+            renderProfileControls(panel);
+            const s=loadSettings();
+            panel.querySelectorAll('[data-key]').forEach(i=>{
+                if(i.type==='checkbox') i.checked=!!s[i.dataset.key];
+                else i.value=String(s[i.dataset.key]||'');
+            });
+            applyPanelBackground(panel);
+            renderRecordManager(panel);
+            panel.querySelector('.sq-status').textContent='已切换学习档案';
+        });
+        panel.querySelector('[data-act="profile-rename"]')?.addEventListener('click',()=>{
+            const input=panel.querySelector('[data-profile-name]');
+            if(!renameActiveProfile(input?.value)) { if(input) input.focus(); return; }
+            renderProfileControls(panel);
+        });
+        panel.querySelector('[data-act="profile-create"]')?.addEventListener('click',()=>{
+            const profile=createProfile();
+            if(!profile) return;
+            renderProfileControls(panel);
+            const s=loadSettings();
+            panel.querySelectorAll('[data-key]').forEach(i=>{
+                if(i.type==='checkbox') i.checked=!!s[i.dataset.key];
+                else i.value=String(s[i.dataset.key]||'');
+            });
+            applyPanelBackground(panel);
+            renderRecordManager(panel);
+            panel.querySelector('.sq-status').textContent='已创建空白学习档案';
+        });
 
         panel.querySelectorAll('[data-key]').forEach(input=>{
             const key=input.dataset.key;
