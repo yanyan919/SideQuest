@@ -19,8 +19,10 @@ export default 'SideQuest';
         repeatLearned: false,
         translationMode: 'english',
         ttsProvider: 'system',
+        fishBaseUrl: 'https://api.fish.audio',
         fishReferenceId: '',
         fishModel: 's2.1-pro-free',
+        mimoBaseUrl: 'https://api.xiaomimimo.com',
         mimoVoice: 'Mia',
         mimoModel: 'mimo-v2.5-tts',
     };
@@ -330,7 +332,8 @@ export default 'SideQuest';
                 const headers={'Authorization':'Bearer '+apiKey,'Content-Type':'application/json','model':String(settings.fishModel||'s2.1-pro-free')};
                 const body={text:spoken,format:'mp3'};
                 if(String(settings.fishReferenceId||'').trim()) body.reference_id=String(settings.fishReferenceId).trim();
-                const response=await fetch('https://api.fish.audio/v1/tts',{method:'POST',headers,body:JSON.stringify(body)});
+                const baseUrl=String(settings.fishBaseUrl||'https://api.fish.audio').trim().replace(/\/+$/,'');
+                const response=await fetch(baseUrl+'/v1/tts',{method:'POST',headers,body:JSON.stringify(body)});
                 if(!response.ok) {
                     const detail=(await response.text().catch(()=>'' )).slice(0,180);
                     throw new Error('Fish Audio 请求失败（HTTP '+response.status+'）'+(detail?'：'+detail:''));
@@ -338,7 +341,8 @@ export default 'SideQuest';
                 blob=await response.blob();
                 if(!blob.size) throw new Error('Fish Audio 返回了空音频。');
             } else if(provider==='mimo') {
-                const response=await fetch('https://api.xiaomimimo.com/v1/chat/completions',{
+                const mimoBaseUrl=String(settings.mimoBaseUrl||'https://api.xiaomimimo.com').trim().replace(/\/+$/,'');
+                const response=await fetch(mimoBaseUrl+'/v1/chat/completions',{
                     method:'POST',
                     headers:{'api-key':apiKey,'Content-Type':'application/json'},
                     body:JSON.stringify({
@@ -1026,20 +1030,33 @@ export default 'SideQuest';
                                 <option value="fish">Fish Audio（在线）</option>
                                 <option value="mimo">MiMo TTS（在线）</option>
                             </select>
-                            <label class="sq-setting-label">Fish Audio API Key</label>
-                            <input class="sq-url-input" type="password" autocomplete="off" data-secret="fishApiKey" placeholder="粘贴 Fish Audio API Key">
-                            <label class="sq-setting-label">Fish Audio 音色 ID（可选）</label>
-                            <input class="sq-url-input" type="text" data-key="fishReferenceId" placeholder="reference_id；留空使用默认音色">
-                            <label class="sq-setting-label">Fish Audio 模型</label>
-                            <input class="sq-url-input" type="text" data-key="fishModel" placeholder="s2.1-pro-free">
-                            <label class="sq-setting-label">MiMo API Key</label>
-                            <input class="sq-url-input" type="password" autocomplete="off" data-secret="mimoApiKey" placeholder="粘贴小米 MiMo API Key">
-                            <label class="sq-setting-label">MiMo 音色</label>
-                            <input class="sq-url-input" type="text" data-key="mimoVoice" placeholder="例如 Mia、Chloe、Milo、Dean">
-                            <label class="sq-setting-label">MiMo 模型</label>
-                            <input class="sq-url-input" type="text" data-key="mimoModel" placeholder="mimo-v2.5-tts">
-                            <button type="button" class="sq-mini-action" data-act="tts-test">试听当前发音</button>
-                            <div class="sq-note">API Key 单独保存在当前浏览器的本地存储，不写入公开插件源码或 ST 的扩展设置镜像；但它仍会以本地可读取的形式保存在浏览器中，请勿在共享设备使用。Fish Audio 和 MiMo 都会收到你点击朗读的文字并生成音频，可能产生费用；API Key/音色是否可用取决于对应服务账号权限。音频仅在当前页面内存缓存最多 20 条，刷新后清空。</div>
+                            <div class="sq-note">下面只显示当前选择的服务设置，切换服务不会删除另一项已保存的配置。</div>
+                            <div data-tts-provider-panel="system"><div class="sq-note">使用设备/浏览器自带语音，不需要 API Key。</div></div>
+                            <div data-tts-provider-panel="fish" hidden>
+                                <label class="sq-setting-label">Fish Audio API URL</label>
+                                <input class="sq-url-input" type="url" data-key="fishBaseUrl" placeholder="https://api.fish.audio">
+                                <label class="sq-setting-label">Fish Audio API Key</label>
+                                <input class="sq-url-input" type="password" autocomplete="off" data-secret="fishApiKey" placeholder="粘贴 Fish Audio API Key">
+                                <label class="sq-setting-label">模型</label>
+                                <input class="sq-url-input" type="text" data-key="fishModel" placeholder="s2.1-pro-free">
+                                <label class="sq-setting-label">音色 ID（可选）</label>
+                                <input class="sq-url-input" type="text" data-key="fishReferenceId" placeholder="reference_id；留空使用服务默认音色">
+                                <button type="button" class="sq-mini-action" data-act="tts-test">测试 Fish Audio 连接并试听</button>
+                                <div class="sq-note">官方云端接口默认使用 https://api.fish.audio/v1/tts。测试会实际合成一句英文，可能计入服务用量。若浏览器报告网络或 CORS 错误，可能需要 ST 后端代理，单改 URL 不能绕过跨域限制。</div>
+                            </div>
+                            <div data-tts-provider-panel="mimo" hidden>
+                                <label class="sq-setting-label">MiMo API URL</label>
+                                <input class="sq-url-input" type="url" data-key="mimoBaseUrl" placeholder="https://api.xiaomimimo.com">
+                                <label class="sq-setting-label">MiMo API Key</label>
+                                <input class="sq-url-input" type="password" autocomplete="off" data-secret="mimoApiKey" placeholder="粘贴小米 MiMo API Key">
+                                <label class="sq-setting-label">模型</label>
+                                <input class="sq-url-input" type="text" data-key="mimoModel" placeholder="mimo-v2.5-tts">
+                                <label class="sq-setting-label">音色</label>
+                                <input class="sq-url-input" type="text" data-key="mimoVoice" placeholder="例如 Mia、Chloe、Milo、Dean">
+                                <button type="button" class="sq-mini-action" data-act="tts-test">测试 MiMo 连接并试听</button>
+                                <div class="sq-note">尚未注册 MiMo 时可以先不填写。测试会发送一段英文到所选服务，可能计入用量。</div>
+                            </div>
+                            <div class="sq-note">API Key 单独保存在当前浏览器的本地存储，不写入公开插件源码或 ST 扩展设置镜像，但并非加密保险箱。云端服务会收到测试文字或你点击朗读的学习文本。音频仅在当前页面内存缓存最多 20 条，刷新后清空。</div>
                         </div>
                     </details>
                     <details class="sq-details">
@@ -1069,7 +1086,8 @@ export default 'SideQuest';
 
         const settingsView=panel.querySelector('.sq-settings');
         const mainView=panel.querySelector('.sq-body');
-        const syncSettingsInputs=()=>{ const current=loadSettings(); panel.querySelectorAll('[data-key]').forEach(i=>{ if(i.type==='checkbox') i.checked=!!current[i.dataset.key]; else i.value=String(current[i.dataset.key]??''); }); syncTtsSecretInputs(panel); };
+        const syncTtsProviderPanels=()=>{ const provider=loadSettings().ttsProvider||'system'; panel.querySelectorAll('[data-tts-provider-panel]').forEach(section=>{ section.hidden=section.dataset.ttsProviderPanel!==provider; }); };
+        const syncSettingsInputs=()=>{ const current=loadSettings(); panel.querySelectorAll('[data-key]').forEach(i=>{ if(i.type==='checkbox') i.checked=!!current[i.dataset.key]; else i.value=String(current[i.dataset.key]??''); }); syncTtsSecretInputs(panel); syncTtsProviderPanels(); };
         const showSettings=()=>{
             const fabRoot=document.getElementById('sidequest-root-v9');
             const fabOrb=document.getElementById(FAB_ID);
@@ -1157,14 +1175,16 @@ export default 'SideQuest';
             panel.querySelector('.sq-status').textContent='已创建空白学习档案';
         });
 
-        panel.querySelector('[data-act="tts-test"]')?.addEventListener('click',()=>{
-            panel.querySelector('.sq-status').textContent='正在生成测试发音……';
+        panel.querySelectorAll('[data-act="tts-test"]').forEach(button=>button.addEventListener('click',()=>{
+            const provider=loadSettings().ttsProvider||'system';
+            const status=panel.querySelector('.sq-status');
+            status.textContent='正在连接 '+(provider==='fish'?'Fish Audio':provider==='mimo'?'MiMo':'系统语音')+' 并生成测试音频……';
             speakText('Hello! This is a SideQuest voice test.').then(()=>{
-                panel.querySelector('.sq-status').textContent='发音测试已开始。';
+                status.textContent='请求已成功，正在播放测试音频。若没有声音，请检查设备音量和浏览器播放权限。';
             }).catch(error=>{
-                panel.querySelector('.sq-status').textContent=String(error?.message||'发音测试失败，请检查设置。');
+                status.textContent=String(error?.message||'连接/试听失败。');
             });
-        });
+        }));
         panel.querySelectorAll('[data-secret]').forEach(input=>{
             const save=()=>saveTtsSecret(input.dataset.secret,input.value);
             input.addEventListener('change',save);
@@ -1184,6 +1204,7 @@ export default 'SideQuest';
                 }
                 s[key]=value;
                 saveSettings(s);
+                if(key==='ttsProvider') syncTtsProviderPanels();
                 applyPanelBackground(panel);
             };
             input.addEventListener(input.type==='checkbox' ? 'change' : 'input',update);
