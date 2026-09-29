@@ -874,6 +874,7 @@ export default 'SideQuest';
             if (fabRoot) fabRoot.style.setProperty('display','block','important');
             if (fabOrb) fabOrb.style.setProperty('display','none','important');
             panel.querySelector('.sq-empty').hidden=true;
+            panel.querySelector('.sq-game-menu').hidden=true;
             panel.querySelector('.sq-card').hidden=true;
             panel.querySelector('.sq-settings').hidden=false;
             panel.querySelector('.sq-status').textContent='设置';
