@@ -1367,6 +1367,7 @@ export default 'SideQuest';
             if (input.type==='checkbox') input.checked=!!current[key];
             else input.value=String(current[key]||'');
             const update=()=>{
+                const current=loadSettings();
                 const value=input.type==='checkbox' ? input.checked : input.value.trim();
                 if(key==='translationMode' && value!=='english' && current.translationMode==='english'){
                     if(!confirm('中文翻译需要把 AI 回复中的中文片段发送给 MyMemory 第三方在线翻译服务。不要切换到包含隐私信息的聊天内容。继续启用吗？')){
