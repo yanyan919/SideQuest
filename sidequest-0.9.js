@@ -258,8 +258,8 @@ export default 'SideQuest';
 
     function saveRecords(records) {
         try {
-            records.learned=records.learned.slice(-200);
-            records.mistakes=records.mistakes.slice(-200);
+            records.learned=records.learned.slice(-1000);
+            records.mistakes=records.mistakes.slice(-1000);
             localStorage.setItem(RECORDS_KEY,JSON.stringify(records));
         } catch {}
     }
@@ -678,7 +678,7 @@ export default 'SideQuest';
                             <label class="sq-setting-row"><input type="checkbox" data-key="learningRecord"><span>保存学习记录</span></label>
                             <label class="sq-setting-row"><input type="checkbox" data-key="mistakeBook"><span>保存错题本</span></label>
                             <label class="sq-setting-row"><input type="checkbox" data-key="repeatLearned"><span>允许已学内容重复出现</span></label>
-                            <div class="sq-record-note">记录只保存很小的文字摘要，最多各 200 条，不保存整段聊天正文。</div>
+                            <div class="sq-record-note">每类记录最多保存 1000 条摘要，不保存整段聊天正文。</div>
                         </div>
                     </details>
                     <details class="sq-details">
