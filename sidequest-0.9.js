@@ -18,6 +18,11 @@ export default 'SideQuest';
         mistakeBook: true,
         repeatLearned: false,
         translationMode: 'english',
+        ttsProvider: 'system',
+        fishReferenceId: '',
+        fishModel: 's2.1-pro-free',
+        mimoVoice: 'Mia',
+        mimoModel: 'mimo-v2.5-tts',
     };
 
     const css = `
@@ -264,20 +269,122 @@ export default 'SideQuest';
             .trim();
     }
 
-    function speakText(text, lang='en-US') {
+    const TTS_SECRETS_KEY='sidequest_v9_tts_secrets';
+    const TTS_AUDIO_CACHE=new Map();
+    let activeTtsAudio=null;
+
+    function loadTtsSecrets() {
         try {
+            const all=JSON.parse(localStorage.getItem(TTS_SECRETS_KEY)||'{}');
+            return all && typeof all==='object' ? (all[activeProfileId()]||{}) : {};
+        } catch { return {}; }
+    }
+
+    function saveTtsSecret(key,value) {
+        try {
+            const all=JSON.parse(localStorage.getItem(TTS_SECRETS_KEY)||'{}');
+            const data=all && typeof all==='object' ? all : {};
+            const id=activeProfileId();
+            data[id]={...(data[id]||{}),[key]:String(value||'')};
+            localStorage.setItem(TTS_SECRETS_KEY,JSON.stringify(data));
+        } catch {}
+    }
+
+    function syncTtsSecretInputs(panel) {
+        if(!panel) return;
+        const secrets=loadTtsSecrets();
+        panel.querySelectorAll('[data-secret]').forEach(input=>{ input.value=String(secrets[input.dataset.secret]||''); });
+    }
+
+    function ttsCacheKey(provider,text,settings) {
+        return [provider,provider==='fish'?settings.fishModel:settings.mimoModel,provider==='fish'?settings.fishReferenceId:settings.mimoVoice,text].join('\u241f');
+    }
+
+    async function speakText(text, lang='en-US') {
+        const spoken=String(text||'').replace(/[\u0000-\u001F\u007F]/g,' ').replace(/\s+/g,' ').trim();
+        if(!spoken) return false;
+        const settings=loadSettings();
+        const provider=settings.ttsProvider||'system';
+        if(provider==='system') {
             const synth=globalThis.speechSynthesis;
-            if (!synth || !text) return false;
+            if(!synth || !globalThis.SpeechSynthesisUtterance) throw new Error('当前浏览器不支持系统语音。');
             synth.cancel();
-            const spoken=String(text).replace(/[\u0000-\u001F\u007F]/g,' ').replace(/\s+/g,' ').trim();
-            if (!spoken) return false;
             const utterance=new SpeechSynthesisUtterance(spoken);
             utterance.lang=lang;
-            utterance.rate=0.82;
+            utterance.rate=0.9;
             utterance.pitch=1;
             synth.speak(utterance);
             return true;
-        } catch { return false; }
+        }
+
+        const secrets=loadTtsSecrets();
+        const secretKey=provider==='fish'?'fishApiKey':'mimoApiKey';
+        const apiKey=String(secrets[secretKey]||'').trim();
+        if(!apiKey) throw new Error('请先在 SideQuest 设置中填写'+(provider==='fish'?'Fish Audio':'MiMo')+' API Key。');
+
+        const cacheKey=ttsCacheKey(provider,spoken,settings);
+        let objectUrl=TTS_AUDIO_CACHE.get(cacheKey);
+        if(!objectUrl) {
+            let blob;
+            if(provider==='fish') {
+                const headers={'Authorization':'Bearer '+apiKey,'Content-Type':'application/json','model':String(settings.fishModel||'s2.1-pro-free')};
+                const body={text:spoken,format:'mp3'};
+                if(String(settings.fishReferenceId||'').trim()) body.reference_id=String(settings.fishReferenceId).trim();
+                const response=await fetch('https://api.fish.audio/v1/tts',{method:'POST',headers,body:JSON.stringify(body)});
+                if(!response.ok) {
+                    const detail=(await response.text().catch(()=>'' )).slice(0,180);
+                    throw new Error('Fish Audio 请求失败（HTTP '+response.status+'）'+(detail?'：'+detail:''));
+                }
+                blob=await response.blob();
+                if(!blob.size) throw new Error('Fish Audio 返回了空音频。');
+            } else if(provider==='mimo') {
+                const response=await fetch('https://api.xiaomimimo.com/v1/chat/completions',{
+                    method:'POST',
+                    headers:{'api-key':apiKey,'Content-Type':'application/json'},
+                    body:JSON.stringify({
+                        model:String(settings.mimoModel||'mimo-v2.5-tts'),
+                        messages:[
+                            {role:'user',content:''},
+                            {role:'assistant',content:spoken}
+                        ],
+                        audio:{format:'mp3',voice:String(settings.mimoVoice||'Mia')}
+                    })
+                });
+                if(!response.ok) {
+                    const detail=(await response.text().catch(()=>'' )).slice(0,180);
+                    throw new Error('MiMo 请求失败（HTTP '+response.status+'）'+(detail?'：'+detail:''));
+                }
+                const data=await response.json();
+                const encoded=data?.choices?.[0]?.message?.audio?.data;
+                if(!encoded) throw new Error('MiMo 没有返回音频，请检查模型名称和音色设置。');
+                const binary=atob(encoded);
+                const bytes=new Uint8Array(binary.length);
+                for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+                blob=new Blob([bytes],{type:'audio/mpeg'});
+            } else {
+                throw new Error('未知的 TTS 方式，请重新选择。');
+            }
+            objectUrl=URL.createObjectURL(blob);
+            TTS_AUDIO_CACHE.set(cacheKey,objectUrl);
+            while(TTS_AUDIO_CACHE.size>20) {
+                const oldest=TTS_AUDIO_CACHE.keys().next().value;
+                const oldUrl=TTS_AUDIO_CACHE.get(oldest);
+                URL.revokeObjectURL(oldUrl);
+                TTS_AUDIO_CACHE.delete(oldest);
+            }
+        }
+        if(activeTtsAudio) { activeTtsAudio.pause(); activeTtsAudio=null; }
+        activeTtsAudio=new Audio(objectUrl);
+        await activeTtsAudio.play();
+        return true;
+    }
+
+    function speakFromPanel(text,panel) {
+        speakText(text).catch(error=>{
+            console.warn('[SideQuest] TTS failed',error);
+            const status=panel?.querySelector('.sq-status');
+            if(status) status.textContent=String(error?.message||'发音失败，请检查 TTS 设置。');
+        });
     }
 
     function englishPairs(text) {
@@ -651,7 +758,7 @@ export default 'SideQuest';
 
         const row=document.createElement('div'); row.className='sq-prompt-row';
         const main=document.createElement('div'); main.className='sq-prompt-main'; main.textContent=item.english; row.appendChild(main);
-        const speak=document.createElement('button'); speak.type='button'; speak.className='sq-inline-speak'; speak.textContent='🔊'; speak.title='听发音'; speak.setAttribute('aria-label','听发音'); speak.onclick=()=>speakText(item.english,'en-US'); row.appendChild(speak);
+        const speak=document.createElement('button'); speak.type='button'; speak.className='sq-inline-speak'; speak.textContent='🔊'; speak.title='听发音'; speak.setAttribute('aria-label','听发音'); speak.onclick=()=>speakFromPanel(item.english,root); row.appendChild(speak);
         prompt.innerHTML=''; prompt.appendChild(row);
 
         const meaning=document.createElement('div'); meaning.className='sq-meaning'; meaning.textContent=item.translation; prompt.appendChild(meaning);
@@ -911,6 +1018,31 @@ export default 'SideQuest';
                         </div>
                     </details>
                     <details class="sq-details">
+                        <summary>发音设置（TTS）</summary>
+                        <div class="sq-details-body">
+                            <label class="sq-setting-label">发音服务</label>
+                            <select class="sq-url-input" data-key="ttsProvider">
+                                <option value="system">系统语音（默认、无需 API）</option>
+                                <option value="fish">Fish Audio（在线）</option>
+                                <option value="mimo">MiMo TTS（在线）</option>
+                            </select>
+                            <label class="sq-setting-label">Fish Audio API Key</label>
+                            <input class="sq-url-input" type="password" autocomplete="off" data-secret="fishApiKey" placeholder="粘贴 Fish Audio API Key">
+                            <label class="sq-setting-label">Fish Audio 音色 ID（可选）</label>
+                            <input class="sq-url-input" type="text" data-key="fishReferenceId" placeholder="reference_id；留空使用默认音色">
+                            <label class="sq-setting-label">Fish Audio 模型</label>
+                            <input class="sq-url-input" type="text" data-key="fishModel" placeholder="s2.1-pro-free">
+                            <label class="sq-setting-label">MiMo API Key</label>
+                            <input class="sq-url-input" type="password" autocomplete="off" data-secret="mimoApiKey" placeholder="粘贴小米 MiMo API Key">
+                            <label class="sq-setting-label">MiMo 音色</label>
+                            <input class="sq-url-input" type="text" data-key="mimoVoice" placeholder="例如 Mia、Chloe、Milo、Dean">
+                            <label class="sq-setting-label">MiMo 模型</label>
+                            <input class="sq-url-input" type="text" data-key="mimoModel" placeholder="mimo-v2.5-tts">
+                            <button type="button" class="sq-mini-action" data-act="tts-test">试听当前发音</button>
+                            <div class="sq-note">API Key 单独保存在当前浏览器的本地存储，不写入公开插件源码或 ST 的扩展设置镜像；但它仍会以本地可读取的形式保存在浏览器中，请勿在共享设备使用。Fish Audio 和 MiMo 都会收到你点击朗读的文字并生成音频，可能产生费用；API Key/音色是否可用取决于对应服务账号权限。音频仅在当前页面内存缓存最多 20 条，刷新后清空。</div>
+                        </div>
+                    </details>
+                    <details class="sq-details">
                         <summary>学习记录</summary>
                         <div class="sq-details-body">
                             <label class="sq-setting-row"><input type="checkbox" data-key="learningRecord"><span>保存学习记录</span></label>
@@ -937,6 +1069,7 @@ export default 'SideQuest';
 
         const settingsView=panel.querySelector('.sq-settings');
         const mainView=panel.querySelector('.sq-body');
+        const syncSettingsInputs=()=>{ const current=loadSettings(); panel.querySelectorAll('[data-key]').forEach(i=>{ if(i.type==='checkbox') i.checked=!!current[i.dataset.key]; else i.value=String(current[i.dataset.key]??''); }); syncTtsSecretInputs(panel); };
         const showSettings=()=>{
             const fabRoot=document.getElementById('sidequest-root-v9');
             const fabOrb=document.getElementById(FAB_ID);
@@ -947,11 +1080,7 @@ export default 'SideQuest';
             panel.querySelector('.sq-card').hidden=true;
             panel.querySelector('.sq-settings').hidden=false;
             panel.querySelector('.sq-status').textContent='设置';
-            const s=loadSettings();
-            panel.querySelectorAll('[data-key]').forEach(i=>{
-                if (i.type==='checkbox') i.checked=!!s[i.dataset.key];
-                else i.value=String(s[i.dataset.key]||'');
-            });
+            syncSettingsInputs();
             renderProfileControls(panel);
             renderRecordManager(panel);
         };
@@ -1004,11 +1133,7 @@ export default 'SideQuest';
         profileSelect?.addEventListener('change',()=>{
             if(!switchActiveProfile(profileSelect.value)) return;
             renderProfileControls(panel);
-            const s=loadSettings();
-            panel.querySelectorAll('[data-key]').forEach(i=>{
-                if(i.type==='checkbox') i.checked=!!s[i.dataset.key];
-                else i.value=String(s[i.dataset.key]||'');
-            });
+            syncSettingsInputs();
             applyPanelBackground(panel);
             renderRecordManager(panel);
             panel.querySelector('.sq-status').textContent='已切换学习档案';
@@ -1032,6 +1157,20 @@ export default 'SideQuest';
             panel.querySelector('.sq-status').textContent='已创建空白学习档案';
         });
 
+        panel.querySelector('[data-act="tts-test"]')?.addEventListener('click',()=>{
+            panel.querySelector('.sq-status').textContent='正在生成测试发音……';
+            speakText('Hello! This is a SideQuest voice test.').then(()=>{
+                panel.querySelector('.sq-status').textContent='发音测试已开始。';
+            }).catch(error=>{
+                panel.querySelector('.sq-status').textContent=String(error?.message||'发音测试失败，请检查设置。');
+            });
+        });
+        panel.querySelectorAll('[data-secret]').forEach(input=>{
+            const save=()=>saveTtsSecret(input.dataset.secret,input.value);
+            input.addEventListener('change',save);
+            input.addEventListener('blur',save);
+        });
+
         panel.querySelectorAll('[data-key]').forEach(input=>{
             const key=input.dataset.key;
             const update=()=>{
@@ -1051,6 +1190,7 @@ export default 'SideQuest';
             input.addEventListener('change',update);
         });
 
+        syncTtsSecretInputs(panel);
         makeDraggable(panel,panel.querySelector('.sq-head'));
         return panel;
     }
