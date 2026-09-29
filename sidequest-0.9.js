@@ -324,10 +324,10 @@ export default 'SideQuest';
     }
 
     let translationJobRunning=false;
-    async function translateChineseSources() {
+    async function translateChineseSources(sourceList) {
         const mode=loadSettings().translationMode||'english';
         if(mode==='english' || translationJobRunning) return;
-        const list=sources();
+        const list=sourceList||sources();
         const cache=loadTranslationCache();
         const pending=[...new Set(list.map(x=>x.line).filter(line=>chineseText(line) && !cache[line]))].slice(0,8);
         if(!pending.length) return;
@@ -569,7 +569,7 @@ export default 'SideQuest';
 
     function buildGame(root) {
         const list=sources();
-        if((loadSettings().translationMode||'english')!=='english') translateChineseSources();
+        if((loadSettings().translationMode||'english')!=='english') translateChineseSources(list);
         const empty=root.querySelector('.sq-empty');
         const card=root.querySelector('.sq-card');
         const menu=root.querySelector('.sq-game-menu');
