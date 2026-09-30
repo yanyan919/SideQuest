@@ -943,6 +943,27 @@ export default 'SideQuest';
     }
 
 
+    const WORD_MEANING_CACHE_KEY='sidequest_v9_word_meanings';
+
+    async function translateWordToChinese(word) {
+        const key=String(word||'').toLowerCase().trim();
+        if(!key) return '';
+        let cache={};
+        try { cache=JSON.parse(localStorage.getItem(WORD_MEANING_CACHE_KEY)||'{}')||{}; } catch {}
+        if(cache[key]) return cache[key];
+        const url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(key)+'&langpair=en-US|zh-CN';
+        const response=await fetch(url);
+        if(!response.ok) throw new Error('translation request failed');
+        const data=await response.json();
+        const value=String(data?.responseData?.translatedText||'').trim();
+        if(!value || value.toLowerCase()===key.toLowerCase() || /[A-Za-z]{10,}/.test(value) && !/[\u3400-\u9fff]/.test(value)) return '';
+        cache[key]=value;
+        const keys=Object.keys(cache);
+        for(const oldKey of keys.slice(0,Math.max(0,keys.length-500))) delete cache[oldKey];
+        try { localStorage.setItem(WORD_MEANING_CACHE_KEY,JSON.stringify(cache)); } catch {}
+        return value;
+    }
+
     async function buildSentenceLab(root,listArg) {
         const list=listArg||sources();
         if((loadSettings().translationMode||'english')!=='english') await translateChineseSources(list);
@@ -985,9 +1006,12 @@ export default 'SideQuest';
         prompt.replaceChildren();box.replaceChildren();feedback.textContent='';
         const sentence=document.createElement('div');sentence.style.cssText='display:flex;flex-wrap:wrap;gap:5px;line-height:1.8;';
         let selected=null;
+        let meaningRequestId=0;
         const detail=document.createElement('div');detail.className='sq-card';detail.style.cssText='margin-top:12px;padding:12px;background:rgba(255,255,255,.035);';
         const detailWord=document.createElement('div');detailWord.style.cssText='font-size:21px;font-weight:800;';detailWord.textContent='点上方任意英文单词';detail.appendChild(detailWord);
-        const detailMeaning=document.createElement('div');detailMeaning.className='sq-meaning';detailMeaning.textContent='选择单词后，这里会显示已有的中文释义。';detail.appendChild(detailMeaning);
+        const detailMeaning=document.createElement('div');detailMeaning.className='sq-meaning';detailMeaning.textContent='点击单词后，查询常见中文意思，并结合原句理解用法。';detail.appendChild(detailMeaning);
+        const detailContext=document.createElement('div');detailContext.className='sq-context';detailContext.style.cssText='margin-top:7px;font-size:12px;';detailContext.textContent='本句语境：'+String(item.english||'');detail.appendChild(detailContext);
+        if(item.translation){const sentenceMeaning=document.createElement('div');sentenceMeaning.className='sq-meaning';sentenceMeaning.textContent='整句意思：'+item.translation;detail.appendChild(sentenceMeaning);}
         const detailActions=document.createElement('div');detailActions.style.cssText='display:flex;gap:8px;margin-top:10px;';
         const hear=document.createElement('button');hear.type='button';hear.className='sq-option';hear.textContent='🔊 听单词';hear.disabled=true;hear.onclick=()=>{if(selected)speakFromPanel(selected,root);};detailActions.appendChild(hear);
         const spell=document.createElement('button');spell.type='button';spell.className='sq-option';spell.textContent='✍️ 练拼写';spell.disabled=true;spell.onclick=()=>{if(selected){root.dataset.sqGame='spell';buildSpelling(root,list,selected);}};detailActions.appendChild(spell);
@@ -999,10 +1023,17 @@ export default 'SideQuest';
             token.onclick=()=>{
                 selected=raw.toLowerCase().replace(/[’]/g,"'");
                 detailWord.textContent=raw;
-                detailMeaning.textContent='结合整句语境理解这个词。';
+                const requestId=++meaningRequestId;
+                detailMeaning.textContent='正在查询常见中文意思……';
                 hear.disabled=false;
                 const canSpell=selected.length>=4&&!COMMON_WORDS.has(selected.replace(/['’]/g,''))&&extractedWords(list).some(x=>x.word.toLowerCase().replace(/[’]/g,"'")===selected);
                 spell.disabled=!canSpell;
+                translateWordToChinese(selected).then(value=>{
+                    if(requestId!==meaningRequestId)return;
+                    detailMeaning.textContent=value?'常见中文意思：'+value:'暂时没有查到可靠的单词翻译；可以结合本句语境理解。';
+                }).catch(()=>{
+                    if(requestId===meaningRequestId)detailMeaning.textContent='在线翻译暂不可用；可以先结合本句语境理解。';
+                });
             };
             sentence.appendChild(token);
         });
