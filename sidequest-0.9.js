@@ -717,13 +717,14 @@ export default 'SideQuest';
             const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
             const text=lines.join('\n');
             const explicitPrefix=/^([^:：\n]{1,40})[:：]\s*(.+)$/;
+        const narrationLead=/^(?:the room|the door|the air|the silence|silence|suddenly|then|after|before|as|when|while|because|but|and|he|she|they|you|i|it|there|here|outside|inside|a|an|the)\b/i;
             const dialogueRanges=[];
             const addDialogue=line=>{ if(s.includeCharacter) pushUnique(speaker,line,'dialogue'); };
 
             // Name: dialogue / Name：dialogue
             for(const line of lines){
                 const m=explicitPrefix.exec(line);
-                if(m && /[A-Za-z]{2,}/.test(m[2])){
+                if(m && !/[.!?]/.test(m[1]) && m[1].trim().split(/\s+/).length<=3 && !narrationLead.test(m[1].trim()) && /[A-Za-z]{2,}/.test(m[2])){
                     if(isUserSpeaker(m[1])) continue;
                     if(s.includeCharacter) pushUnique(m[1].trim()||speaker,m[2],'dialogue');
                     const pos=text.indexOf(line);
@@ -807,7 +808,6 @@ export default 'SideQuest';
         const mode=panel.dataset.sqGame || 'menu';
         if (mode === 'word') buildWord(panel);
         else if (mode === 'learn') buildLearn(panel);
-        else if (mode === 'collect') buildWordBank(panel);
         else if (mode === 'sentence') buildSentenceLab(panel);
         else if (mode === 'spell') buildSpelling(panel);
         else if (mode === 'records') buildRecordBook(panel);
@@ -911,10 +911,6 @@ export default 'SideQuest';
                 <span class="sq-game-emoji">📖</span>
                 <span><b>学习</b><small>先把剧情里不会的英文看懂、听懂</small></span>
             </button>
-            <button type="button" class="sq-game-choice" data-game="collect">
-                <span class="sq-game-emoji">🧲</span>
-                <span><b>单词收集</b><small>从 AI 剧情里抓取英文单词，点开查看出处</small></span>
-            </button>
             <button type="button" class="sq-game-choice" data-game="sentence">
                 <span class="sq-game-emoji">🧩</span>
                 <span><b>句子拆解</b><small>点句子里的单词看释义、听发音，再挑词练拼写</small></span>
@@ -931,18 +927,6 @@ export default 'SideQuest';
                 <span class="sq-game-emoji">🔎</span>
                 <span><b>单词寻宝</b><small>从剧情里学词，再用语境确认意思</small></span>
             </button>
-            <button type="button" class="sq-game-choice" data-game="speaker">
-                <span class="sq-game-emoji">💬</span>
-                <span><b>谁说的？</b><small>看一句话，猜它是谁说的</small><em>准备中</em></span>
-            </button>
-            <button type="button" class="sq-game-choice" data-game="meaning">
-                <span class="sq-game-emoji">🧩</span>
-                <span><b>情境猜意</b><small>根据上下文猜这个词是什么意思</small><em>准备中</em></span>
-            </button>
-            <button type="button" class="sq-game-choice" data-game="rebuild">
-                <span class="sq-game-emoji">🪄</span>
-                <span><b>句子拼图</b><small>把剧情里的句子重新拼起来</small><em>准备中</em></span>
-            </button>
         `;
 
         menu.querySelectorAll('[data-game]').forEach(button=>{
@@ -952,12 +936,6 @@ export default 'SideQuest';
                     root.dataset.sqGame='learn';
                     root.querySelector('.sq-game-menu').hidden=true;
                     buildLearn(root,list);
-                    return;
-                }
-                if (game === 'collect') {
-                    root.dataset.sqGame='collect';
-                    root.querySelector('.sq-game-menu').hidden=true;
-                    buildWordBank(root,list);
                     return;
                 }
                 if (game === 'sentence') {
@@ -1003,8 +981,35 @@ export default 'SideQuest';
     async function buildSentenceLab(root,listArg) {
         const list=listArg||sources();
         if((loadSettings().translationMode||'english')!=='english') await translateChineseSources(list);
-        const pairs=list.flatMap(item=>englishPairs(item.line).map(pair=>({...pair,speaker:item.speaker,source:item.line,kind:item.kind}))).filter(x=>/[A-Za-z]{3,}/.test(x.english||''));
-        const items=pairs.length?pairs:learningItems(list).filter(x=>/[A-Za-z]{3,}/.test(x.english||''));
+        const mode=loadSettings().translationMode||'english';
+        const candidates=[];
+        for(const source of list){
+            const pairs=englishPairs(source.line);
+            if(pairs.length){
+                pairs.forEach(pair=>candidates.push({...pair,speaker:source.speaker,source:source.line,kind:source.kind}));
+                continue;
+            }
+            // English-only dialogue is also useful sentence material; previously the
+            // lab only used explicit English（Chinese） pairs, making the pool tiny.
+            if(mode!=='chinese' && /[A-Za-z]{3,}/.test(source.line)){
+                const chunks=String(source.line).match(/[^.!?]+(?:[.!?]+|$)/g)||[source.line];
+                for(const chunk of chunks){
+                    const english=chunk.trim();
+                    if(english.length>=12 && english.length<=280 && /[A-Za-z]{3,}/.test(english)){
+                        candidates.push({english,translation:'',speaker:source.speaker,source:source.line,kind:source.kind});
+                    }
+                }
+            }
+        }
+        if(mode!=='english'){
+            learningItems(list).filter(x=>/[A-Za-z]{3,}/.test(x.english||'')).forEach(x=>candidates.push(x));
+        }
+        const seenSentences=new Set();
+        const items=candidates.filter(x=>{
+            const key=String(x.english||'').toLowerCase().replace(/\s+/g,' ').trim();
+            if(!key || seenSentences.has(key)) return false;
+            seenSentences.add(key); return true;
+        });
         const empty=root.querySelector('.sq-empty'),card=root.querySelector('.sq-card'),menu=root.querySelector('.sq-game-menu');
         if(!items.length){empty.hidden=false;card.hidden=true;menu.hidden=true;root.querySelector('.sq-status').textContent='暂时没有可拆解的英文句子。';return;}
         const item=items[Math.floor(Math.random()*items.length)];
@@ -1018,7 +1023,6 @@ export default 'SideQuest';
         let dictionaryRequestId=0;
         const detail=document.createElement('div');detail.className='sq-card';detail.style.cssText='margin-top:12px;padding:12px;background:rgba(255,255,255,.035);';
         const detailWord=document.createElement('div');detailWord.style.cssText='font-size:21px;font-weight:800;';detailWord.textContent='点上方任意英文单词';detail.appendChild(detailWord);
-        const detailPhon=document.createElement('div');detailPhon.className='sq-meaning';detailPhon.textContent='音标会在可用时自动查询';detail.appendChild(detailPhon);
         const detailMeaning=document.createElement('div');detailMeaning.className='sq-meaning';detailMeaning.textContent='选择单词后，这里会显示已有的中文释义。';detail.appendChild(detailMeaning);
         const detailActions=document.createElement('div');detailActions.style.cssText='display:flex;gap:8px;margin-top:10px;';
         const hear=document.createElement('button');hear.type='button';hear.className='sq-option';hear.textContent='🔊 听单词';hear.disabled=true;hear.onclick=()=>{if(selected)speakFromPanel(selected,root);};detailActions.appendChild(hear);
@@ -1030,20 +1034,11 @@ export default 'SideQuest';
             const token=document.createElement('button');token.type='button';token.className='sq-option';token.style.cssText='display:inline-block;width:auto;min-height:34px;padding:4px 7px;font-size:15px;';token.textContent=raw;
             token.onclick=()=>{
                 selected=raw.toLowerCase().replace(/[’]/g,"'");
-                detailWord.textContent=raw;detailPhon.textContent='音标：查询中…';
+                detailWord.textContent=raw;
                 detailMeaning.textContent='结合整句语境理解这个词。';
                 hear.disabled=false;
                 const canSpell=selected.length>=4&&!COMMON_WORDS.has(selected.replace(/['’]/g,''))&&extractedWords(list).some(x=>x.word.toLowerCase().replace(/[’]/g,"'")===selected);
                 spell.disabled=!canSpell;
-                const requestId=++dictionaryRequestId;
-                lookupDictionary(selected).then(data=>{
-                    if(requestId!==dictionaryRequestId)return;
-                    const entry=Array.isArray(data)?data[0]:null;
-                    const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;
-                    detailPhon.textContent='音标：'+(phon||'暂未查到');
-                    const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;
-                    if(def)detailMeaning.textContent=def;
-                }).catch(()=>{if(requestId===dictionaryRequestId)detailPhon.textContent='音标：暂不可用';});
             };
             sentence.appendChild(token);
         });
