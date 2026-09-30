@@ -333,7 +333,8 @@ export default 'SideQuest';
                 const body={text:spoken,format:'mp3'};
                 if(String(settings.fishReferenceId||'').trim()) body.reference_id=String(settings.fishReferenceId).trim();
                 const baseUrl=String(settings.fishBaseUrl||'https://api.fish.audio').trim().replace(/\/+$/,'');
-                const response=await fetch(baseUrl+'/v1/tts',{method:'POST',headers,body:JSON.stringify(body)});
+                const proxyUrl='/proxy/'+baseUrl+'/v1/tts';
+                const response=await fetch(proxyUrl,{method:'POST',headers,body:JSON.stringify(body)});
                 if(!response.ok) {
                     const detail=(await response.text().catch(()=>'' )).slice(0,180);
                     throw new Error('Fish Audio 请求失败（HTTP '+response.status+'）'+(detail?'：'+detail:''));
@@ -342,7 +343,8 @@ export default 'SideQuest';
                 if(!blob.size) throw new Error('Fish Audio 返回了空音频。');
             } else if(provider==='mimo') {
                 const mimoBaseUrl=String(settings.mimoBaseUrl||'https://api.xiaomimimo.com').trim().replace(/\/+$/,'');
-                const response=await fetch(mimoBaseUrl+'/v1/chat/completions',{
+                const proxyUrl='/proxy/'+mimoBaseUrl+'/v1/chat/completions';
+                const response=await fetch(proxyUrl,{
                     method:'POST',
                     headers:{'api-key':apiKey,'Content-Type':'application/json'},
                     body:JSON.stringify({
@@ -681,9 +683,30 @@ export default 'SideQuest';
     }
 
     const COMMON_WORDS=new Set(('the a an and or but if then than so because as at by for from in into of on onto to with without about above after before between during through over under again once here there where when while who whom whose which what this that these those i me my mine we us our ours you your yours he him his she her hers it its they them their theirs am is are was were be been being do does did doing have has had having can could will would shall should may might must not no yes very too also just only even still already really quite rather almost ever never always often sometimes usually maybe perhaps all some any each every both few many much more most less least own same other another such s t re ve ll d m don doesn didn isn aren wasn weren won wouldn couldn shouldn cannot cant im youre hes shes theyre youll thats theres whats').split(/\s+/));
+    function vocabularySources(list) {
+        const mode=loadSettings().translationMode||'english';
+        const cache=loadTranslationCache();
+        const result=[];
+        const add=(line,source,translation,item)=>{
+            const text=String(line||'').trim();
+            if(!text) return;
+            result.push({line:text,source:String(source||text),translation:String(translation||''),speaker:item.speaker||'Character',kind:item.kind||'narration'});
+        };
+        for(const item of list||[]) {
+            const line=String(item.line||'');
+            const pairs=englishPairs(line);
+            if(mode!=='chinese') {
+                if(pairs.length) pairs.forEach(pair=>add(pair.english,line,pair.translation,item));
+                else if(!chineseText(line)) add(line,line,'',item);
+            }
+            if(mode!=='english' && chineseText(line) && cache[line]) add(cache[line],line,line,item);
+        }
+        return result;
+    }
+
     function extractedWords(list) {
         const words=new Map();
-        for(const source of list||[]) {
+        for(const source of vocabularySources(list)) {
             const line=String(source.line||'').replace(/\[[a-z_-]{2,}\]/gi,' ');
             const matches=line.match(/[A-Za-z][A-Za-z'’\-]{2,}/g)||[];
             for(const raw of matches) {
@@ -692,10 +715,11 @@ export default 'SideQuest';
                 if(normalized.length<3 || COMMON_WORDS.has(normalized) || !/[aeiou]/i.test(normalized)) continue;
                 if(/^(.)\1{2,}$/i.test(normalized)) continue;
                 const key=normalized;
-                if(!words.has(key)) words.set(key,{english:word,word:normalized,translation:'',source:line,speaker:source.speaker||'Character',kind:source.kind||'narration',count:0,key:'word|'+key});
+                if(!words.has(key)) words.set(key,{english:word,word:normalized,translation:source.translation||'',source:source.source||line,speaker:source.speaker||'Character',kind:source.kind||'narration',count:0,key:'word|'+key});
                 const item=words.get(key);
                 item.count++;
-                if(item.source.length<line.length) item.source=line;
+                if(item.source.length<String(source.source||line).length) item.source=String(source.source||line);
+                if(!item.translation && source.translation) item.translation=source.translation;
             }
         }
         return [...words.values()].sort((a,b)=>b.count-a.count||a.english.localeCompare(b.english));
@@ -703,7 +727,6 @@ export default 'SideQuest';
 
     function buildGame(root) {
         const list=sources();
-        if((loadSettings().translationMode||'english')!=='english') translateChineseSources(list);
         const empty=root.querySelector('.sq-empty');
         const card=root.querySelector('.sq-card');
         const menu=root.querySelector('.sq-game-menu');
@@ -780,9 +803,9 @@ export default 'SideQuest';
     }
 
 
-    function buildLearn(root,listArg) {
+    async function buildLearn(root,listArg) {
         const list=listArg||sources();
-        if((loadSettings().translationMode||'english')!=='english') translateChineseSources();
+        if((loadSettings().translationMode||'english')!=='english') await translateChineseSources(list);
         let items=learningItems(list);
         const s=loadSettings();
         if(!s.repeatLearned && s.learningRecord) items=items.filter(x=>!hasLearned(x));
@@ -820,8 +843,10 @@ export default 'SideQuest';
 
     }
 
-    function buildWordBank(root,listArg) {
+    async function buildWordBank(root,listArg) {
         const list=listArg||sources();
+        const mode=loadSettings().translationMode||'english';
+        if(mode!=='english') await translateChineseSources(list);
         const words=extractedWords(list);
         const empty=root.querySelector('.sq-empty'), card=root.querySelector('.sq-card'), menu=root.querySelector('.sq-game-menu'), status=root.querySelector('.sq-status');
         if(!words.length) {
@@ -866,8 +891,10 @@ export default 'SideQuest';
         spell.onclick=()=>{root.dataset.sqGame='spell';buildSpelling(root,listArg||sources(),item.word);};box.appendChild(spell);
     }
 
-    function buildSpelling(root,listArg,forcedWord) {
+    async function buildSpelling(root,listArg,forcedWord) {
         const list=listArg||sources();
+        const modeSetting=loadSettings().translationMode||'english';
+        if(modeSetting!=='english') await translateChineseSources(list);
         const words=extractedWords(list).filter(x=>x.word.length>=4);
         const pool=forcedWord?words.filter(x=>x.word===String(forcedWord).toLowerCase()):words;
         const available=pool.length?pool:words;
