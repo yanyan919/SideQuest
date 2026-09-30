@@ -331,7 +331,13 @@ export default 'SideQuest';
             if(!db) return null;
             return await new Promise(resolve=>{
                 const request=db.transaction(TTS_CACHE_STORE,'readonly').objectStore(TTS_CACHE_STORE).get(key);
-                request.onsuccess=()=>resolve(request.result?.blob instanceof Blob ? request.result.blob : null);
+                request.onsuccess=()=>{
+                    const record=request.result;
+                    if(record?.blob instanceof Blob){
+                        try { const touch=db.transaction(TTS_CACHE_STORE,'readwrite'); touch.objectStore(TTS_CACHE_STORE).put({...record,usedAt:Date.now()}); } catch {}
+                        resolve(record.blob);
+                    } else resolve(null);
+                };
                 request.onerror=()=>resolve(null);
             });
         } catch { return null; }
@@ -988,17 +994,18 @@ export default 'SideQuest';
         const hear=document.createElement('button');hear.type='button';hear.className='sq-option';hear.textContent='🔊 听单词';hear.disabled=true;hear.onclick=()=>{if(selected)speakFromPanel(selected,root);};detailActions.appendChild(hear);
         const spell=document.createElement('button');spell.type='button';spell.className='sq-option';spell.textContent='✍️ 练拼写';spell.disabled=true;spell.onclick=()=>{if(selected){root.dataset.sqGame='spell';buildSpelling(root,list,selected);}};detailActions.appendChild(spell);
         detail.appendChild(detailActions);
-        const words=item.english.match(/[A-Za-z][A-Za-z'’-]*/g)||[];
-        words.forEach((raw,index)=>{
-            const token=document.createElement('button');token.type='button';token.className='sq-option';token.style.cssText='width:auto;min-height:34px;padding:4px 7px;font-size:15px;';token.textContent=raw;
+        const tokens=String(item.english||'').match(/[A-Za-z][A-Za-z'’-]*|[^A-Za-z]+/g)||[];
+        tokens.forEach(raw=>{
+            if(!/^[A-Za-z]/.test(raw)){sentence.appendChild(document.createTextNode(raw));return;}
+            const token=document.createElement('button');token.type='button';token.className='sq-option';token.style.cssText='display:inline-block;width:auto;min-height:34px;padding:4px 7px;font-size:15px;';token.textContent=raw;
             token.onclick=()=>{
-                selected=raw.toLowerCase().replace(/[’]/g,"'");detailWord.textContent=raw;detailPhon.textContent='音标：查询中…';
-                detailMeaning.textContent=raw.toLowerCase()===String(item.english||'').toLowerCase()?String(item.translation||'整句可以结合上下文理解。'):'点击发音或根据整句语境理解这个词。';
-                hear.disabled=false;spell.disabled=selected.length<3;
-                fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(selected)).then(r=>r.ok?r.json():null).then(data=>{const entry=Array.isArray(data)?data[0]:null;const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;detailPhon.textContent='音标：'+(phon||'暂未查到');const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;if(def)detailMeaning.textContent=(item.translation&&selected===String(item.english||'').toLowerCase()?item.translation+' · ':'')+def;}).catch(()=>{detailPhon.textContent='音标：暂不可用';});
+                selected=raw.toLowerCase().replace(/[’]/g,"'");
+                detailWord.textContent=raw;detailPhon.textContent='音标：查询中…';
+                detailMeaning.textContent='结合整句语境理解这个词。';
+                hear.disabled=false;spell.disabled=selected.length<4||COMMON_WORDS.has(selected.replace(/['’]/g,''));
+                fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(selected)).then(r=>r.ok?r.json():null).then(data=>{const entry=Array.isArray(data)?data[0]:null;const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;detailPhon.textContent='音标：'+(phon||'暂未查到');const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;if(def)detailMeaning.textContent=def;}).catch(()=>{detailPhon.textContent='音标：暂不可用';});
             };
             sentence.appendChild(token);
-            const next=String(item.english||'').match(/[A-Za-z][A-Za-z'’-]*/g)||[];if(index<next.length-1){const gap=document.createElement('span');gap.textContent=' ';sentence.appendChild(gap);}
         });
         prompt.appendChild(sentence);
         const translation=document.createElement('div');translation.className='sq-meaning';translation.style.marginTop='10px';translation.textContent=item.translation||'这句暂时没有现成翻译；可以先逐词拆解。';prompt.appendChild(translation);
