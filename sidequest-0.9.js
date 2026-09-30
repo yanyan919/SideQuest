@@ -300,8 +300,8 @@ export default 'SideQuest';
     const TTS_AUDIO_CACHE=new Map();
     const TTS_CACHE_DB='sidequest_tts_audio_v1';
     const TTS_CACHE_STORE='audio';
-    const TTS_CACHE_MAX_ITEMS=40;
-    const TTS_CACHE_MAX_BYTES=20*1024*1024;
+    const TTS_CACHE_MAX_ITEMS=200;
+    const TTS_CACHE_MAX_BYTES=50*1024*1024;
     let ttsCacheDbPromise=null;
     let activeTtsAudio=null;
 
@@ -893,6 +893,10 @@ export default 'SideQuest';
                 <span class="sq-game-emoji">🧲</span>
                 <span><b>单词收集</b><small>从 AI 剧情里抓取英文单词，点开查看出处</small></span>
             </button>
+            <button type="button" class="sq-game-choice" data-game="sentence">
+                <span class="sq-game-emoji">🧩</span>
+                <span><b>句子拆解</b><small>点句子里的单词看释义、听发音，再挑词练拼写</small></span>
+            </button>
             <button type="button" class="sq-game-choice" data-game="records">
                 <span class="sq-game-emoji">📚</span>
                 <span><b>我的学习档案</b><small>直接查看收藏夹、已学记录和错题本</small></span>
@@ -934,6 +938,12 @@ export default 'SideQuest';
                     buildWordBank(root,list);
                     return;
                 }
+                if (game === 'sentence') {
+                    root.dataset.sqGame='sentence';
+                    root.querySelector('.sq-game-menu').hidden=true;
+                    buildSentenceLab(root,list);
+                    return;
+                }
                 if (game === 'records') {
                     root.dataset.sqGame='records';
                     root.querySelector('.sq-game-menu').hidden=true;
@@ -955,6 +965,48 @@ export default 'SideQuest';
     }
 
 
+    async function buildSentenceLab(root,listArg) {
+        const list=listArg||sources();
+        if((loadSettings().translationMode||'english')!=='english') await translateChineseSources(list);
+        const pairs=list.flatMap(item=>englishPairs(item.line).map(pair=>({...pair,speaker:item.speaker,source:item.line,kind:item.kind}))).filter(x=>/[A-Za-z]{3,}/.test(x.english||''));
+        const items=pairs.length?pairs:learningItems(list).filter(x=>/[A-Za-z]{3,}/.test(x.english||''));
+        const empty=root.querySelector('.sq-empty'),card=root.querySelector('.sq-card'),menu=root.querySelector('.sq-game-menu');
+        if(!items.length){empty.hidden=false;card.hidden=true;menu.hidden=true;root.querySelector('.sq-status').textContent='暂时没有可拆解的英文句子。';return;}
+        const item=items[Math.floor(Math.random()*items.length)];
+        empty.hidden=true;menu.hidden=true;card.hidden=false;
+        root.querySelector('.sq-label').textContent='SENTENCE LAB';
+        root.querySelector('.sq-status').textContent='点句子里的词，逐个查看；选中一个词后可以练拼写。';
+        const prompt=root.querySelector('.sq-prompt'),box=root.querySelector('.sq-options'),feedback=root.querySelector('.sq-feedback');
+        prompt.replaceChildren();box.replaceChildren();feedback.textContent='';
+        const sentence=document.createElement('div');sentence.style.cssText='display:flex;flex-wrap:wrap;gap:5px;line-height:1.8;';
+        let selected=null;
+        const detail=document.createElement('div');detail.className='sq-card';detail.style.cssText='margin-top:12px;padding:12px;background:rgba(255,255,255,.035);';
+        const detailWord=document.createElement('div');detailWord.style.cssText='font-size:21px;font-weight:800;';detailWord.textContent='点上方任意英文单词';detail.appendChild(detailWord);
+        const detailPhon=document.createElement('div');detailPhon.className='sq-meaning';detailPhon.textContent='音标会在可用时自动查询';detail.appendChild(detailPhon);
+        const detailMeaning=document.createElement('div');detailMeaning.className='sq-meaning';detailMeaning.textContent='选择单词后，这里会显示已有的中文释义。';detail.appendChild(detailMeaning);
+        const detailActions=document.createElement('div');detailActions.style.cssText='display:flex;gap:8px;margin-top:10px;';
+        const hear=document.createElement('button');hear.type='button';hear.className='sq-option';hear.textContent='🔊 听单词';hear.disabled=true;hear.onclick=()=>{if(selected)speakFromPanel(selected,root);};detailActions.appendChild(hear);
+        const spell=document.createElement('button');spell.type='button';spell.className='sq-option';spell.textContent='✍️ 练拼写';spell.disabled=true;spell.onclick=()=>{if(selected){root.dataset.sqGame='spell';buildSpelling(root,list,selected);}};detailActions.appendChild(spell);
+        detail.appendChild(detailActions);
+        const words=item.english.match(/[A-Za-z][A-Za-z'’-]*/g)||[];
+        words.forEach((raw,index)=>{
+            const token=document.createElement('button');token.type='button';token.className='sq-option';token.style.cssText='width:auto;min-height:34px;padding:4px 7px;font-size:15px;';token.textContent=raw;
+            token.onclick=()=>{
+                selected=raw.toLowerCase().replace(/[’]/g,"'");detailWord.textContent=raw;detailPhon.textContent='音标：查询中…';
+                detailMeaning.textContent=raw.toLowerCase()===String(item.english||'').toLowerCase()?String(item.translation||'整句可以结合上下文理解。'):'点击发音或根据整句语境理解这个词。';
+                hear.disabled=false;spell.disabled=selected.length<3;
+                fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(selected)).then(r=>r.ok?r.json():null).then(data=>{const entry=Array.isArray(data)?data[0]:null;const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;detailPhon.textContent='音标：'+(phon||'暂未查到');const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;if(def)detailMeaning.textContent=(item.translation&&selected===String(item.english||'').toLowerCase()?item.translation+' · ':'')+def;}).catch(()=>{detailPhon.textContent='音标：暂不可用';});
+            };
+            sentence.appendChild(token);
+            const next=String(item.english||'').match(/[A-Za-z][A-Za-z'’-]*/g)||[];if(index<next.length-1){const gap=document.createElement('span');gap.textContent=' ';sentence.appendChild(gap);}
+        });
+        prompt.appendChild(sentence);
+        const translation=document.createElement('div');translation.className='sq-meaning';translation.style.marginTop='10px';translation.textContent=item.translation||'这句暂时没有现成翻译；可以先逐词拆解。';prompt.appendChild(translation);
+        const sentenceHear=document.createElement('button');sentenceHear.type='button';sentenceHear.className='sq-option';sentenceHear.style.marginTop='10px';sentenceHear.textContent='🔊 听整句';sentenceHear.onclick=()=>speakFromPanel(item.english,root);prompt.appendChild(sentenceHear);
+        prompt.appendChild(detail);
+        const next=document.createElement('button');next.type='button';next.className='sq-option';next.textContent='换一句 →';next.onclick=()=>buildSentenceLab(root,sources());box.appendChild(next);
+        const back=document.createElement('button');back.type='button';back.className='sq-option';back.textContent='← 返回小游戏菜单';back.onclick=()=>buildGame(root);box.appendChild(back);
+    }
     async function buildLearn(root,listArg) {
         const list=listArg||sources();
         if((loadSettings().translationMode||'english')!=='english') await translateChineseSources(list);
@@ -1008,11 +1060,11 @@ export default 'SideQuest';
         }
         empty.hidden=true; menu.hidden=true; card.hidden=false;
         root.querySelector('.sq-label').textContent='WORD COLLECTION';
-        status.textContent='从最近的 AI 回复中找到 '+words.length+' 个不同单词。点一个词查看原句。';
+        status.textContent='共收集 '+words.length+' 个不同单词。点词查看释义、发音和练习。';
         const prompt=root.querySelector('.sq-prompt'), box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
-        prompt.textContent='单词收集 · '+words.length+' 词';
+        prompt.textContent='我的词汇 · '+words.length+' 词';
         box.replaceChildren(); feedback.textContent='';
-        const note=document.createElement('div'); note.className='sq-context'; note.textContent='只统计 AI/角色回复；常见功能词已过滤。单词来自最近聊天内容，不会修改原文。'; box.appendChild(note);
+        const note=document.createElement('div'); note.className='sq-context'; note.textContent='点单词查看学习卡片；收藏的词会保存在学习档案里。'; box.appendChild(note);
         const grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px;';
         words.slice(0,80).forEach(item=>{
             const b=document.createElement('button'); b.type='button'; b.className='sq-option'; b.style.cssText='min-width:0;overflow-wrap:anywhere;text-align:left;';
@@ -1029,9 +1081,9 @@ export default 'SideQuest';
             }
             const countLabel=document.createElement('span');
             countLabel.style.cssText='display:block;margin-top:5px;font-size:11px;opacity:.62;';
-            countLabel.textContent='出现 '+item.count+' 次 · 点开查看原句';
+            countLabel.textContent=item.count>1?'出现 '+item.count+' 次':'点开学习';
             b.appendChild(countLabel);
-            b.style.minHeight='72px';
+            b.style.minHeight='66px';
             b.onclick=()=>buildWordDetail(root,item,list);
             grid.appendChild(b);
         });
@@ -1042,13 +1094,22 @@ export default 'SideQuest';
     function buildWordDetail(root,item,listArg) {
         const prompt=root.querySelector('.sq-prompt'), box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
         root.querySelector('.sq-label').textContent='WORD DETAIL';
-        root.querySelector('.sq-status').textContent='来自 AI 回复的单词素材';
+        root.querySelector('.sq-status').textContent='单词学习卡 · 发音、释义、语境和拼写';
         prompt.replaceChildren();
         const row=document.createElement('div');row.className='sq-prompt-row';
         const word=document.createElement('div');word.className='sq-prompt-main';word.style.cssText='font-size:23px;font-weight:800;';word.textContent=item.english;row.appendChild(word);
         const speak=document.createElement('button');speak.type='button';speak.className='sq-inline-speak';speak.textContent='🔊';speak.title='听单词发音';speak.onclick=()=>speakFromPanel(item.english,root);row.appendChild(speak);prompt.appendChild(row);
-        const context=document.createElement('div');context.className='sq-context';context.textContent='原句：'+item.source;prompt.appendChild(context);
-        const source=document.createElement('div');source.className='sq-source';source.textContent='角色：'+item.speaker+' · 出现 '+item.count+' 次';prompt.appendChild(source);
+        const phonetic=document.createElement('div');phonetic.className='sq-meaning';phonetic.textContent='音标：查询中…';prompt.appendChild(phonetic);
+        const meaning=document.createElement('div');meaning.className='sq-meaning';meaning.textContent=item.translation||'可以结合原句理解这个词的意思。';prompt.appendChild(meaning);
+        const contextDetails=document.createElement('details');contextDetails.style.cssText='margin-top:10px;font-size:13px;line-height:1.6;';
+        const contextSummary=document.createElement('summary');contextSummary.textContent='查看原句与语境';contextSummary.style.cursor='pointer';contextDetails.appendChild(contextSummary);
+        const context=document.createElement('div');context.className='sq-context';context.textContent=item.source;contextDetails.appendChild(context);
+        const contextMeta=document.createElement('div');contextMeta.className='sq-source';contextMeta.textContent=item.speaker+' · 出现 '+item.count+' 次';contextDetails.appendChild(contextMeta);prompt.appendChild(contextDetails);
+        fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(item.word)).then(r=>r.ok?r.json():null).then(data=>{
+            const entry=Array.isArray(data)?data[0]:null;
+            const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;
+            phonetic.textContent='音标：'+(phon||'暂未查到');
+        }).catch(()=>{phonetic.textContent='音标：暂不可用';});
         box.replaceChildren();feedback.textContent='';
         const save=document.createElement('button');save.type='button';save.className='sq-option';save.textContent=isFavorite(item)?'★ 已收藏（点此取消）':'☆ 收藏到我的收藏夹';
         save.onclick=()=>{
