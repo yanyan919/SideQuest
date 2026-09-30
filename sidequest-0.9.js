@@ -68,6 +68,30 @@ export default 'SideQuest';
             backdrop-filter: blur(14px);
         }
         #${PANEL_ID}.sq-hidden { display: none !important; }
+        #${PANEL_ID} {
+            background:linear-gradient(145deg,rgba(34,31,48,.94),rgba(24,31,39,.92));
+            border-color:rgba(204,190,255,.22);
+            box-shadow:0 24px 80px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.07);
+        }
+        #${PANEL_ID} .sq-head { background:linear-gradient(100deg,rgba(190,169,255,.10),rgba(148,226,211,.045)); border-bottom-color:rgba(210,201,255,.12); }
+        #${PANEL_ID} .sq-title { letter-spacing:.02em; }
+        #${PANEL_ID} .sq-icon { border:1px solid rgba(255,255,255,.08); transition:background .16s ease,transform .16s ease; }
+        #${PANEL_ID} .sq-icon:hover { background:rgba(190,169,255,.18); }
+        #${PANEL_ID} .sq-game-choice {
+            background:linear-gradient(115deg,rgba(255,255,255,.065),rgba(190,169,255,.035));
+            border-color:rgba(205,194,255,.13); box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+            transition:transform .16s ease,border-color .16s ease,background .16s ease;
+        }
+        #${PANEL_ID} .sq-game-choice:hover { transform:translateY(-1px); border-color:rgba(198,180,255,.34); background:linear-gradient(115deg,rgba(190,169,255,.13),rgba(148,226,211,.07)); }
+        #${PANEL_ID} .sq-game-choice .sq-game-emoji { display:grid;place-items:center;height:42px;border-radius:13px;background:rgba(190,169,255,.09); }
+        #${PANEL_ID} .sq-card { background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(190,169,255,.035)); border-color:rgba(205,194,255,.15); box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
+        #${PANEL_ID} .sq-label { color:#c9b8ff; opacity:.82; }
+        #${PANEL_ID} .sq-prompt { background:linear-gradient(135deg,rgba(0,0,0,.20),rgba(190,169,255,.055)); border:1px solid rgba(205,194,255,.08); }
+        #${PANEL_ID} .sq-option, #${PANEL_ID} .sq-next, #${PANEL_ID} .sq-back { border-color:rgba(205,194,255,.13); background:linear-gradient(100deg,rgba(255,255,255,.065),rgba(190,169,255,.035)); transition:transform .14s ease,border-color .14s ease,background .14s ease; }
+        #${PANEL_ID} .sq-option:not(:disabled):hover { border-color:rgba(190,169,255,.35); background:rgba(190,169,255,.11); }
+        #${PANEL_ID} .sq-option:not(:disabled):active { transform:scale(.99); }
+        #${PANEL_ID} .sq-inline-speak { background:rgba(190,169,255,.12); border:1px solid rgba(205,194,255,.13); }
+        #${PANEL_ID} .sq-feedback { line-height:1.55; }
         #${PANEL_ID} .sq-head {
             display:flex; align-items:center; justify-content:space-between; gap:10px;
             padding:14px 14px 12px 17px;
@@ -339,8 +363,13 @@ export default 'SideQuest';
                     const detail=(await response.text().catch(()=>'' )).slice(0,180);
                     throw new Error('Fish Audio 请求失败（HTTP '+response.status+'）'+(detail?'：'+detail:''));
                 }
+                const fishType=String(response.headers.get('content-type')||'').toLowerCase();
                 blob=await response.blob();
                 if(!blob.size) throw new Error('Fish Audio 返回了空音频。');
+                if(fishType.includes('json') || fishType.includes('text/html')) {
+                    const detail=(await blob.text().catch(()=>'' )).slice(0,160);
+                    throw new Error('Fish Audio 返回的不是音频，而是 '+fishType+'。'+(detail?'接口信息：'+detail:'请检查 API URL 和服务器代理设置。'));
+                }
             } else if(provider==='mimo') {
                 const mimoBaseUrl=String(settings.mimoBaseUrl||'https://api.xiaomimimo.com').trim().replace(/\/+$/,'');
                 const proxyUrl='/proxy/'+mimoBaseUrl+'/v1/chat/completions';
@@ -381,7 +410,17 @@ export default 'SideQuest';
         }
         if(activeTtsAudio) { activeTtsAudio.pause(); activeTtsAudio=null; }
         activeTtsAudio=new Audio(objectUrl);
-        await activeTtsAudio.play();
+        activeTtsAudio.preload='auto';
+        try {
+            await activeTtsAudio.play();
+        } catch(error) {
+            const name=String(error?.name||'');
+            if(name==='NotSupportedError' || /operation is not supported|not supported/i.test(String(error?.message||''))) {
+                throw new Error('浏览器无法播放这段音频（The operation is not supported）。可能是接口返回的音频格式不兼容、音频内容无效，或 iPhone 浏览器限制了异步播放。请先试试“系统语音”；如果只有 Fish/MiMo 报错，请检查该接口返回的音频格式。');
+            }
+            if(name==='NotAllowedError') throw new Error('浏览器阻止了音频播放。请直接点击单词旁的发音按钮再试一次，或检查 iPhone 的静音/网页音频设置。');
+            throw error;
+        }
         return true;
     }
 
@@ -389,7 +428,7 @@ export default 'SideQuest';
         speakText(text).catch(error=>{
             console.warn('[SideQuest] TTS failed',error);
             const status=panel?.querySelector('.sq-status');
-            if(status) status.textContent=String(error?.message||'发音失败，请检查 TTS 设置。');
+            if(status) status.textContent=String(error?.message||'发音失败，请检查 TTS 设置。')+'（详情已记录到浏览器控制台）';
         });
     }
 
