@@ -1051,6 +1051,8 @@ export default 'SideQuest';
         notYet.onclick=()=>{ markMistake(item,'还不会'); feedback.textContent='没关系，记一下。'; setTimeout(()=>{ if(root.dataset.sqGame==='learn') buildLearn(root,sources()); },620); };
         actions.appendChild(learned); actions.appendChild(notYet);
         box.appendChild(actions);
+        const dissect=document.createElement('button');dissect.type='button';dissect.className='sq-option';dissect.textContent='🧩 拆解这句话';dissect.onclick=()=>{root.dataset.sqGame='sentence';buildSentenceLab(root,list);};box.appendChild(dissect);
+        const spelling=document.createElement('button');spelling.type='button';spelling.className='sq-option';spelling.textContent='✍️ 去练拼写';spelling.onclick=()=>{root.dataset.sqGame='spell';buildSpelling(root,list);};box.appendChild(spelling);
 
     }
 
