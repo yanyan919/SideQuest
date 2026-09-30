@@ -367,10 +367,18 @@ export default 'SideQuest';
                 const fishType=String(response.headers.get('content-type')||'').toLowerCase();
                 blob=await response.blob();
                 if(!blob.size) throw new Error('Fish Audio 返回了空音频。');
-                if(fishType.includes('json') || fishType.includes('text/html') || (!fishType.startsWith('audio/') && !fishType.includes('octet-stream'))) {
-                    const detail=(await blob.text().catch(()=>'' )).slice(0,160);
-                    throw new Error('Fish Audio 返回的不是音频，而是 '+fishType+'。'+(detail?'接口信息：'+detail:'请检查 API URL 和服务器代理设置。'));
+                // Some proxy paths strip Content-Type even when the body is valid MP3.
+                // Inspect the bytes before treating an unknown content type as an error.
+                const bytes=new Uint8Array(await blob.slice(0,4).arrayBuffer());
+                const hasId3=bytes.length>=3 && bytes[0]===0x49 && bytes[1]===0x44 && bytes[2]===0x33;
+                const hasMpegFrame=bytes.length>=2 && bytes[0]===0xFF && (bytes[1]&0xE0)===0xE0;
+                const looksLikeMp3=hasId3||hasMpegFrame;
+                const declaredNonAudio=fishType.includes('json') || fishType.includes('text/html') || fishType.startsWith('text/');
+                if(declaredNonAudio || (!fishType.startsWith('audio/') && !fishType.includes('octet-stream') && !looksLikeMp3)) {
+                    const detail=(await blob.slice(0,160).text().catch(()=>'' )).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\uFFFF]/g,'�').slice(0,120);
+                    throw new Error('Fish Audio 返回内容无法识别为音频（Content-Type: '+(fishType||'未提供')+'）。'+(detail?'响应开头：'+detail:'请检查 ST 代理和 API URL。'));
                 }
+                if(looksLikeMp3 && !fishType.startsWith('audio/')) blob=new Blob([await blob.arrayBuffer()],{type:'audio/mpeg'});
             } else if(provider==='mimo') {
                 const mimoBaseUrl=String(settings.mimoBaseUrl||'https://api.xiaomimimo.com').trim().replace(/\/+$/,'');
                 const proxyUrl='/proxy/'+mimoBaseUrl+'/v1/chat/completions';
@@ -522,9 +530,9 @@ export default 'SideQuest';
     function loadRecords() {
         try {
             const raw=JSON.parse(localStorage.getItem(RECORDS_KEY)||'{}');
-            const records={ learned:Array.isArray(raw.learned)?raw.learned:[], mistakes:Array.isArray(raw.mistakes)?raw.mistakes:[] };
+            const records={ learned:Array.isArray(raw.learned)?raw.learned:[], mistakes:Array.isArray(raw.mistakes)?raw.mistakes:[], favorites:Array.isArray(raw.favorites)?raw.favorites:[] };
             // Existing records are migrated into the first profile without deleting them.
-            for(const list of [records.learned,records.mistakes]) for(const item of list) if(!item.profile) item.profile=DEFAULT_PROFILE_ID;
+            for(const list of [records.learned,records.mistakes,records.favorites]) for(const item of list) if(!item.profile) item.profile=DEFAULT_PROFILE_ID;
             return records;
         } catch { return { learned:[], mistakes:[] }; }
     }
@@ -533,6 +541,7 @@ export default 'SideQuest';
         try {
             records.learned=records.learned.slice(-1000);
             records.mistakes=records.mistakes.slice(-1000);
+            records.favorites=(Array.isArray(records.favorites)?records.favorites:[]).slice(-1000);
             localStorage.setItem(RECORDS_KEY,JSON.stringify(records));
         } catch {}
     }
@@ -555,6 +564,22 @@ export default 'SideQuest';
         records.learned=records.learned.filter(x=>!(x.profile===activeProfileId() && x.chat===chatKey() && x.key===key));
         records.learned.push({profile:activeProfileId(),chat:chatKey(),key,english:item.english||item.word,translation:item.translation||'',time:Date.now()});
         saveRecords(records);
+    }
+
+    function isFavorite(item) {
+        const key=recordKey(item);
+        return loadRecords().favorites.some(x=>x.profile===activeProfileId() && x.key===key);
+    }
+
+    function toggleFavorite(item) {
+        const records=loadRecords();
+        const profile=activeProfileId();
+        const key=recordKey(item);
+        const exists=records.favorites.some(x=>x.profile===profile && x.key===key);
+        if(exists) records.favorites=records.favorites.filter(x=>!(x.profile===profile && x.key===key));
+        else records.favorites.push({profile,chat:chatKey(),key,english:item.english||item.word||'',translation:item.translation||'',source:item.source||'',speaker:item.speaker||'',count:Number(item.count)||1,time:Date.now()});
+        saveRecords(records);
+        return !exists;
     }
 
     function markMistake(item,answer) {
@@ -794,6 +819,10 @@ export default 'SideQuest';
                 <span class="sq-game-emoji">🧲</span>
                 <span><b>单词收集</b><small>从 AI 剧情里抓取英文单词，点开查看出处</small></span>
             </button>
+            <button type="button" class="sq-game-choice" data-game="records">
+                <span class="sq-game-emoji">📚</span>
+                <span><b>我的学习档案</b><small>直接查看收藏夹、已学记录和错题本</small></span>
+            </button>
             <button type="button" class="sq-game-choice" data-game="spell">
                 <span class="sq-game-emoji">✍️</span>
                 <span><b>拼写挑战</b><small>根据剧情句子或打乱字母练习拼写</small></span>
@@ -829,6 +858,12 @@ export default 'SideQuest';
                     root.dataset.sqGame='collect';
                     root.querySelector('.sq-game-menu').hidden=true;
                     buildWordBank(root,list);
+                    return;
+                }
+                if (game === 'records') {
+                    root.dataset.sqGame='records';
+                    root.querySelector('.sq-game-menu').hidden=true;
+                    buildRecordBook(root);
                     return;
                 }
                 if (game === 'spell') {
@@ -926,8 +961,21 @@ export default 'SideQuest';
         const context=document.createElement('div');context.className='sq-context';context.textContent='原句：'+item.source;prompt.appendChild(context);
         const source=document.createElement('div');source.className='sq-source';source.textContent='角色：'+item.speaker+' · 出现 '+item.count+' 次';prompt.appendChild(source);
         box.replaceChildren();feedback.textContent='';
-        const save=document.createElement('button');save.type='button';save.className='sq-option';save.textContent='☆ 收藏 / 标记为已学';
-        save.onclick=()=>{markLearned(item);feedback.textContent='已加入学习记录。';};box.appendChild(save);
+        const save=document.createElement('button');save.type='button';save.className='sq-option';save.textContent=isFavorite(item)?'★ 已收藏（点此取消）':'☆ 收藏到我的收藏夹';
+        save.onclick=()=>{
+            const added=toggleFavorite(item);
+            save.textContent=added?'★ 已收藏（点此取消）':'☆ 收藏到我的收藏夹';
+            feedback.textContent=added?'已保存到「我的学习档案」→「我的收藏夹」。':'已从收藏夹移除。';
+            const panel=document.getElementById(PANEL_ID);
+            if(panel) renderRecordManager(panel);
+        };box.appendChild(save);
+        const learned=document.createElement('button');learned.type='button';learned.className='sq-option';learned.textContent='✓ 标记为已学';
+        learned.onclick=()=>{
+            markLearned(item);
+            feedback.textContent=loadSettings().learningRecord?'已加入学习记录。':'你关闭了「保存学习记录」，所以这次没有保存。';
+            const panel=document.getElementById(PANEL_ID);
+            if(panel) renderRecordManager(panel);
+        };box.appendChild(learned);
         const back=document.createElement('button');back.type='button';back.className='sq-option';back.textContent='← 返回单词列表';
         back.onclick=()=>buildWordBank(root,listArg||sources());box.appendChild(back);
         const spell=document.createElement('button');spell.type='button';spell.className='sq-option';spell.textContent='✍️ 用这个词练习拼写';
@@ -1101,14 +1149,15 @@ export default 'SideQuest';
         if(note) note.textContent=data.profiles.length>=3?'最多创建 3 套档案。':'每套档案的设置、学习记录和错题本独立保存。';
     }
 
-    function renderRecordManager(panel) {
-        const host=panel.querySelector('[data-record-manager]');
+    function renderRecordManager(panel,hostOverride) {
+        const host=hostOverride||panel.querySelector('[data-record-manager]');
         if(!host) return;
         host.innerHTML='';
         const records=loadRecords();
         const profile=activeProfileId();
         const learned=records.learned.filter(x=>x.profile===profile);
         const mistakes=records.mistakes.filter(x=>x.profile===profile);
+        const favorites=records.favorites.filter(x=>x.profile===profile);
         const makeSection=(title,items,type)=>{
             const section=document.createElement('section');
             section.style.cssText='margin:8px 0 14px;';
@@ -1146,23 +1195,43 @@ export default 'SideQuest';
                 del.onclick=()=>{
                     const latest=loadRecords();
                     latest[type]=latest[type].filter(x=>!(x.profile===profile && x.time===item.time && x.key===item.key && (type!=='mistakes'||x.wrong===item.wrong)));
-                    saveRecords(latest); renderRecordManager(panel);
+                    saveRecords(latest); renderRecordManager(panel,host);
                 };
                 row.append(content,del); section.appendChild(row);
             });
+            const labels={learned:'学习记录',mistakes:'错题本',favorites:'收藏夹'};
             const clear=document.createElement('button');
-            clear.type='button'; clear.className='sq-mini-action'; clear.textContent='清空本档案的'+(type==='learned'?'学习记录':'错题本');
+            clear.type='button'; clear.className='sq-mini-action'; clear.textContent='清空本档案的'+(labels[type]||'记录');
             clear.onclick=()=>{
-                if(!confirm('确定清空本档案的'+(type==='learned'?'学习记录':'错题本')+'吗？此操作无法撤销。')) return;
+                if(!confirm('确定清空本档案的'+(labels[type]||'记录')+'吗？此操作无法撤销。')) return;
                 const latest=loadRecords();
                 latest[type]=latest[type].filter(x=>x.profile!==profile);
-                saveRecords(latest); renderRecordManager(panel);
+                saveRecords(latest); renderRecordManager(panel,host);
             };
             section.appendChild(clear);
             host.appendChild(section);
         };
+        makeSection('我的收藏夹',favorites,'favorites');
         makeSection('已学记录',learned,'learned');
         makeSection('错题本',mistakes,'mistakes');
+    }
+
+    function buildRecordBook(root) {
+        const empty=root.querySelector('.sq-empty'), card=root.querySelector('.sq-card'), menu=root.querySelector('.sq-game-menu');
+        empty.hidden=true; menu.hidden=true; card.hidden=false;
+        root.querySelector('.sq-label').textContent='MY LEARNING LIBRARY';
+        root.querySelector('.sq-status').textContent='当前学习档案的收藏、已学记录与错题本。';
+        root.querySelector('.sq-prompt').textContent='收藏夹与学习记录保存在当前浏览器，并按学习档案分开。';
+        const box=root.querySelector('.sq-options');
+        box.replaceChildren();
+        const host=document.createElement('div');
+        host.dataset.recordManagerView='';
+        box.appendChild(host);
+        renderRecordManager(root,host);
+        const back=document.createElement('button');
+        back.type='button'; back.className='sq-option'; back.textContent='← 返回小游戏菜单';
+        back.onclick=()=>buildGame(root);
+        box.appendChild(back);
     }
 
     function createPanel() {
