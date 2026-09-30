@@ -981,6 +981,19 @@ export default 'SideQuest';
     }
 
 
+    async function lookupDictionary(word) {
+        const url='https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(word);
+        try {
+            const direct=await fetch(url);
+            if(direct.ok) return await direct.json();
+        } catch {}
+        try {
+            const proxied=await fetch('/proxy/'+url);
+            if(proxied.ok) return await proxied.json();
+        } catch {}
+        return null;
+    }
+
     async function buildSentenceLab(root,listArg) {
         const list=listArg||sources();
         if((loadSettings().translationMode||'english')!=='english') await translateChineseSources(list);
@@ -1017,17 +1030,14 @@ export default 'SideQuest';
                 const canSpell=selected.length>=4&&!COMMON_WORDS.has(selected.replace(/['’]/g,''))&&extractedWords(list).some(x=>x.word.toLowerCase().replace(/[’]/g,"'")===selected);
                 spell.disabled=!canSpell;
                 const requestId=++dictionaryRequestId;
-                fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(selected))
-                    .then(r=>r.ok?r.json():null)
-                    .then(data=>{
-                        if(requestId!==dictionaryRequestId)return;
-                        const entry=Array.isArray(data)?data[0]:null;
-                        const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;
-                        detailPhon.textContent='音标：'+(phon||'暂未查到');
-                        const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;
-                        if(def)detailMeaning.textContent=def;
-                    })
-                    .catch(()=>{if(requestId===dictionaryRequestId)detailPhon.textContent='音标：暂不可用';});
+                lookupDictionary(selected).then(data=>{
+                    if(requestId!==dictionaryRequestId)return;
+                    const entry=Array.isArray(data)?data[0]:null;
+                    const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;
+                    detailPhon.textContent='音标：'+(phon||'暂未查到');
+                    const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;
+                    if(def)detailMeaning.textContent=def;
+                }).catch(()=>{if(requestId===dictionaryRequestId)detailPhon.textContent='音标：暂不可用';});
             };
             sentence.appendChild(token);
         });
@@ -1668,19 +1678,12 @@ export default 'SideQuest';
             const update=()=>{
                 const s=loadSettings();
                 const value=input.type==='checkbox' ? input.checked : input.value.trim();
-                if(key==='translationMode' && value!=='english' && s.translationMode==='english'){
-                    if(!confirm('中文翻译需要把 AI 回复中的中文片段发送给 MyMemory 第三方在线翻译服务。不要切换到包含隐私信息的聊天内容。继续启用吗？')){
-                        input.value=s.translationMode;
-                        return;
-                    }
-                }
                 s[key]=value;
                 saveSettings(s);
                 if(key==='ttsProvider') syncTtsProviderPanels();
                 applyPanelBackground(panel);
             };
-            input.addEventListener(input.type==='checkbox' ? 'change' : 'input',update);
-            input.addEventListener('change',update);
+            input.addEventListener(input.type==='checkbox' || input.tagName==='SELECT' ? 'change' : 'input',update);
         });
 
         syncTtsSecretInputs(panel);
@@ -2018,12 +2021,6 @@ export default 'SideQuest';
             const update=()=>{
                 const current=loadSettings();
                 const value=input.type==='checkbox' ? input.checked : input.value.trim();
-                if(key==='translationMode' && value!=='english' && current.translationMode==='english'){
-                    if(!confirm('中文翻译需要把 AI 回复中的中文片段发送给 MyMemory 第三方在线翻译服务。不要切换到包含隐私信息的聊天内容。继续启用吗？')){
-                        input.value=current.translationMode;
-                        return;
-                    }
-                }
                 current[key]=value;
                 saveSettings(current);
                 if (context?.extensionSettings?.sidequest) {
@@ -2036,8 +2033,7 @@ export default 'SideQuest';
                     if (!current.enabled) document.getElementById(PANEL_ID)?.classList.add('sq-hidden');
                 }
             };
-            input.addEventListener(input.type==='checkbox' ? 'change' : 'input',update);
-            input.addEventListener('change',update);
+            input.addEventListener(input.type==='checkbox' || input.tagName==='SELECT' ? 'change' : 'input',update);
         });
         syncDrawerProfile();
     }
