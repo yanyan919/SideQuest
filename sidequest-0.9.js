@@ -186,14 +186,20 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-settings p { margin:0 0 14px; font-size:11px; opacity:.58; line-height:1.5; }
         #${PANEL_ID} .sq-setting-row { display:flex; align-items:center; gap:9px; padding:9px 0; font-size:12px; }
         #${PANEL_ID} .sq-setting-row input { margin:0; }
-        .sq-details { margin:10px 0; border:1px solid rgba(255,255,255,.10); border-radius:12px; background:rgba(255,255,255,.035); overflow:hidden; }
-        .sq-details summary { cursor:pointer; padding:11px 12px; font-size:12px; font-weight:700; list-style:none; }
+        .sq-details { margin:9px 0; border:1px solid rgba(255,255,255,.10); border-radius:13px; background:rgba(255,255,255,.035); overflow:hidden; }
+        .sq-details summary { cursor:pointer; padding:12px 13px; font-size:12px; font-weight:700; list-style:none; transition:background .15s ease; }
+        .sq-details summary:active { background:rgba(255,255,255,.045); }
         .sq-details summary::-webkit-details-marker { display:none; }
         .sq-details summary::after { content:'＋'; float:right; opacity:.55; }
         .sq-details[open] summary::after { content:'−'; }
-        .sq-details-body { padding:3px 12px 10px; }
-        .sq-setting-label { display:block; font-size:10px; opacity:.55; margin:8px 0 6px; }
-        .sq-url-input { width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid rgba(255,255,255,.12); border-radius:9px; background:rgba(0,0,0,.18); color:#f2f2f2 !important; }
+        .sq-details-body { padding:4px 13px 12px; }
+        .sq-setting-label { display:block; font-size:11px; opacity:.68; margin:10px 0 6px; line-height:1.45; }
+        .sq-url-input { width:100%; box-sizing:border-box; padding:10px 11px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(0,0,0,.18); color:#f2f2f2 !important; font:inherit; font-size:13px; min-height:40px; }
+        .sq-url-input:focus { outline:2px solid rgba(148,205,196,.35); outline-offset:1px; border-color:rgba(148,205,196,.45); }
+        #sidequest-panel-v9 .sq-note { font-size:11px; line-height:1.65; opacity:.62; margin:8px 0; overflow-wrap:anywhere; }
+        @media (prefers-reduced-motion: reduce) {
+            #sidequest-panel-v9 *, #sidequest-fab-v9 { transition:none !important; animation:none !important; }
+        }
         #${SETTINGS_ID} { margin-top:8px; }
         #${SETTINGS_ID} .sq-note { opacity:.55; font-size:11px; line-height:1.5; }
         @media (max-width:600px) {
@@ -834,7 +840,7 @@ export default 'SideQuest';
                 lastSignature=signature;
                 refreshOpenGame();
             }
-        },1200);
+        },2200);
     }
 
     const COMMON_WORDS=new Set(('the a an and or but if then than so because as at by for from in into of on onto to with without about above after before between during through over under again once here there where when while who whom whose which what this that these those i me my mine we us our ours you your yours he him his she her hers it its they them their theirs am is are was were be been being do does did doing have has had having can could will would shall should may might must not no yes very too also just only even still already really quite rather almost ever never always often sometimes usually maybe perhaps all some any each every both few many much more most less least own same other another such s t re ve ll d m don doesn didn isn aren wasn weren won wouldn couldn shouldn cannot cant im youre hes shes theyre youll thats theres whats').split(/\s+/));
