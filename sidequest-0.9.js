@@ -716,38 +716,16 @@ export default 'SideQuest';
 
             const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
             const text=lines.join('\n');
-            const explicitPrefix=/^([^:：\n]{1,40})[:：]\s*(.+)$/;
-        const narrationLead=/^(?:the room|the door|the air|the silence|silence|suddenly|then|after|before|as|when|while|because|but|and|he|she|they|you|i|it|there|here|outside|inside|a|an|the)\b/i;
             const dialogueRanges=[];
-            const addDialogue=line=>{ if(s.includeCharacter) pushUnique(speaker,line,'dialogue'); };
-
-            // Name: dialogue / Name：dialogue
-            for(const line of lines){
-                const m=explicitPrefix.exec(line);
-                if(m && !/[.!?]/.test(m[1]) && m[1].trim().split(/\s+/).length<=3 && !narrationLead.test(m[1].trim()) && /[A-Za-z]{2,}/.test(m[2])){
-                    if(isUserSpeaker(m[1])) continue;
-                    if(s.includeCharacter) pushUnique(m[1].trim()||speaker,m[2],'dialogue');
-                    const pos=text.indexOf(line);
-                    if(pos>=0) dialogueRanges.push([pos,pos+line.length]);
-                }
-            }
-
-            // “...” / "..." / 「...」 / 『...』
-            const quoteRe=/[“「『"]([\s\S]{4,260}?)[”」』"]/g;
+            // 对白采用严格白名单：只有成对引号内部的文字才算对白。
+            // 支持英文直引号、弯引号及中文/日式引号；不再把冒号标签或英文（中文）格式
+            // 自动认作对白，避免旁白被误收进“只抓对白”模式。
+            const quoteRe=/“([^”]{2,260})”|"([^"]{2,260})"|「([^」]{2,260})」|『([^』]{2,260})』/g;
             let match;
             while((match=quoteRe.exec(text))){
-                const before=text.slice(Math.max(0,match.index-70),match.index);
-                // 明确写成 You: / User: 的对白不抓。
-                if(/(?:^|[\s])(you|user)\s*[:：]\s*$/i.test(before)) continue;
+                const quoted=match[1]??match[2]??match[3]??match[4]??'';
                 dialogueRanges.push([match.index,quoteRe.lastIndex]);
-                addDialogue(match[1]);
-            }
-
-            // English（中文） / English(中文)
-            const pairRe=/([A-Za-z][A-Za-z'’.,!?;:\-\s]{2,240})[（(]([^）)]{1,220})[）)]/g;
-            while((match=pairRe.exec(text))){
-                dialogueRanges.push([match.index,pairRe.lastIndex]);
-                addDialogue(match[0]);
+                if(s.includeCharacter) pushUnique(speaker,quoted,'dialogue');
             }
 
             if(s.includeNarration){
@@ -1159,8 +1137,8 @@ export default 'SideQuest';
         const modeSetting=loadSettings().translationMode||'english';
         if(modeSetting!=='english') await translateChineseSources(list);
         const words=extractedWords(list).filter(x=>x.word.length>=4);
-        const pool=forcedWord?words.filter(x=>x.word===String(forcedWord).toLowerCase()):words;
-        const available=pool.length?pool:words;
+        const pool=forcedWord?words.filter(x=>x.word===String(forcedWord).toLowerCase().replace(/[’]/g,"'")):words;
+        const available=pool;
         const empty=root.querySelector('.sq-empty'), card=root.querySelector('.sq-card'), menu=root.querySelector('.sq-game-menu');
         if(!available.length) {
             empty.hidden=false;card.hidden=true;menu.hidden=true;
@@ -1209,25 +1187,40 @@ export default 'SideQuest';
         const list=listArg||sources();
         const pairs=list.flatMap(item=>englishPairs(item.line).map(pair=>({...pair,speaker:item.speaker,source:item.line,kind:item.kind})));
         const allItems=learningItems(list);
-        const pool=pairs.length?pairs:allItems.filter(x=>/[A-Za-z]{3,}/.test(x.english||''));
+        const sentenceItems=list.flatMap(item=>{
+            const found=englishPairs(item.line);
+            const chunks=String(item.line||'').match(/[^.!?]+(?:[.!?]+|$)/g)||[];
+            return chunks.map(chunk=>{
+                const english=chunk.trim();
+                if(english.length<12 || english.length>280 || !/[A-Za-z]{3,}/.test(english)) return null;
+                const paired=found.find(pair=>english.includes(pair.english)||pair.english.includes(english));
+                return {english,translation:paired?.translation||'',speaker:item.speaker,source:item.line,kind:item.kind};
+            }).filter(Boolean);
+        });
+        const pool=[];
+        const seenPool=new Set();
+        for(const item of [...pairs,...sentenceItems,...allItems.filter(x=>/[A-Za-z]{3,}/.test(x.english||''))]){
+            const key=String(item.english||'').toLowerCase().replace(/\\s+/g,' ').trim();
+            if(key && !seenPool.has(key)){seenPool.add(key);pool.push(item);}
+        }
         if(!pool.length){ root.querySelector('.sq-empty').hidden=false; root.querySelector('.sq-card').hidden=true; root.querySelector('.sq-game-menu').hidden=true; root.querySelector('.sq-status').textContent='找到剧情了，但暂时没有英文。'; return; }
 
         const target=pool[Math.floor(Math.random()*pool.length)];
         root.querySelector('.sq-empty').hidden=true; root.querySelector('.sq-game-menu').hidden=true; root.querySelector('.sq-card').hidden=false;
         root.querySelector('.sq-label').textContent='WORD HUNT';
-        root.querySelector('.sq-status').textContent=pairs.length?'语境复习：选出这句话最符合的意思。':'词汇复习：从原句里找出目标词。';
+        root.querySelector('.sq-status').textContent=target.translation?'语境复习：选出这句话最符合的意思。':'词汇复习：从原句里找出目标词。';
 
         const card=root.querySelector('.sq-card'); card.querySelectorAll('.sq-door').forEach(x=>x.remove());
         const prompt=root.querySelector('.sq-prompt'), box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
         box.innerHTML=''; feedback.textContent='';
 
         const row=document.createElement('div'); row.className='sq-prompt-row';
-        const main=document.createElement('div'); main.className='sq-prompt-main'; main.textContent=pairs.length?target.english:'哪个单词真的出现在这句剧情里？\n'+target.english; row.appendChild(main);
+        const main=document.createElement('div'); main.className='sq-prompt-main'; main.textContent=target.translation?target.english:'从这句剧情中找词：\n'+target.english; row.appendChild(main);
         const speak=document.createElement('button'); speak.type='button'; speak.className='sq-inline-speak'; speak.textContent='🔊'; speak.title='听这句'; speak.setAttribute('aria-label','听这句'); speak.onclick=()=>speakText(target.english,'en-US'); row.appendChild(speak);
         prompt.innerHTML=''; prompt.appendChild(row);
 
-        if(pairs.length){
-            const other=pairs.filter(x=>x!==target&&x.translation!==target.translation).map(x=>x.translation).filter(Boolean);
+        if(target.translation){
+            const other=pool.filter(x=>x!==target&&x.translation&&x.translation!==target.translation).map(x=>x.translation).filter(Boolean);
             const fallbacks=['她没有回答，只是看着你。','他似乎没有想到会这样。','你决定暂时保持沉默。'];
             const choices=[target.translation,...other,...fallbacks].filter((x,i,a)=>x&&a.indexOf(x)===i).slice(0,3);
             while(choices.length<3) choices.push(['先离开这里。','她轻轻笑了起来。','你不知道该说什么。'][choices.length-1]);
