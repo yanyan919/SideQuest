@@ -965,19 +965,6 @@ export default 'SideQuest';
     }
 
 
-    async function lookupDictionary(word) {
-        const url='https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(word);
-        try {
-            const direct=await fetch(url);
-            if(direct.ok) return await direct.json();
-        } catch {}
-        try {
-            const proxied=await fetch('/proxy/'+url);
-            if(proxied.ok) return await proxied.json();
-        } catch {}
-        return null;
-    }
-
     async function buildSentenceLab(root,listArg) {
         const list=listArg||sources();
         if((loadSettings().translationMode||'english')!=='english') await translateChineseSources(list);
@@ -1020,7 +1007,6 @@ export default 'SideQuest';
         prompt.replaceChildren();box.replaceChildren();feedback.textContent='';
         const sentence=document.createElement('div');sentence.style.cssText='display:flex;flex-wrap:wrap;gap:5px;line-height:1.8;';
         let selected=null;
-        let dictionaryRequestId=0;
         const detail=document.createElement('div');detail.className='sq-card';detail.style.cssText='margin-top:12px;padding:12px;background:rgba(255,255,255,.035);';
         const detailWord=document.createElement('div');detailWord.style.cssText='font-size:21px;font-weight:800;';detailWord.textContent='点上方任意英文单词';detail.appendChild(detailWord);
         const detailMeaning=document.createElement('div');detailMeaning.className='sq-meaning';detailMeaning.textContent='选择单词后，这里会显示已有的中文释义。';detail.appendChild(detailMeaning);
@@ -1141,17 +1127,11 @@ export default 'SideQuest';
         const row=document.createElement('div');row.className='sq-prompt-row';
         const word=document.createElement('div');word.className='sq-prompt-main';word.style.cssText='font-size:23px;font-weight:800;';word.textContent=item.english;row.appendChild(word);
         const speak=document.createElement('button');speak.type='button';speak.className='sq-inline-speak';speak.textContent='🔊';speak.title='听单词发音';speak.onclick=()=>speakFromPanel(item.english,root);row.appendChild(speak);prompt.appendChild(row);
-        const phonetic=document.createElement('div');phonetic.className='sq-meaning';phonetic.textContent='音标：查询中…';prompt.appendChild(phonetic);
         const meaning=document.createElement('div');meaning.className='sq-meaning';meaning.textContent=item.translation||'可以结合原句理解这个词的意思。';prompt.appendChild(meaning);
         const contextDetails=document.createElement('details');contextDetails.style.cssText='margin-top:10px;font-size:13px;line-height:1.6;';
         const contextSummary=document.createElement('summary');contextSummary.textContent='查看原句与语境';contextSummary.style.cursor='pointer';contextDetails.appendChild(contextSummary);
         const context=document.createElement('div');context.className='sq-context';context.textContent=item.source;contextDetails.appendChild(context);
         const contextMeta=document.createElement('div');contextMeta.className='sq-source';contextMeta.textContent=item.speaker+' · 出现 '+item.count+' 次';contextDetails.appendChild(contextMeta);prompt.appendChild(contextDetails);
-        fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(item.word)).then(r=>r.ok?r.json():null).then(data=>{
-            const entry=Array.isArray(data)?data[0]:null;
-            const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;
-            phonetic.textContent='音标：'+(phon||'暂未查到');
-        }).catch(()=>{phonetic.textContent='音标：暂不可用';});
         box.replaceChildren();feedback.textContent='';
         const save=document.createElement('button');save.type='button';save.className='sq-option';save.textContent=isFavorite(item)?'★ 已收藏（点此取消）':'☆ 收藏到我的收藏夹';
         save.onclick=()=>{
