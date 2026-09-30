@@ -1653,6 +1653,7 @@ export default 'SideQuest';
             speakText('Hello! This is a SideQuest voice test.','en-US',{bypassCache:true}).then(()=>{
                 status.textContent='请求已成功，正在播放测试音频。若没有声音，请检查设备音量和浏览器播放权限。';
             }).catch(error=>{
+                console.warn('[SideQuest] TTS connection test failed',error);
                 status.textContent=String(error?.message||'连接/试听失败。');
             });
         }));
