@@ -866,6 +866,54 @@ export default 'SideQuest';
         spell.onclick=()=>{root.dataset.sqGame='spell';buildSpelling(root,listArg||sources(),item.word);};box.appendChild(spell);
     }
 
+    function buildSpelling(root,listArg,forcedWord) {
+        const list=listArg||sources();
+        const words=extractedWords(list).filter(x=>x.word.length>=4);
+        const pool=forcedWord?words.filter(x=>x.word===String(forcedWord).toLowerCase()):words;
+        const available=pool.length?pool:words;
+        const empty=root.querySelector('.sq-empty'), card=root.querySelector('.sq-card'), menu=root.querySelector('.sq-game-menu');
+        if(!available.length) {
+            empty.hidden=false;card.hidden=true;menu.hidden=true;
+            root.querySelector('.sq-status').textContent='还没有足够长的英文单词可以进行拼写练习。';
+            return;
+        }
+        const target=available[Math.floor(Math.random()*available.length)];
+        const mode=forcedWord?'context':(Math.random()<0.5?'context':'scramble');
+        empty.hidden=true;menu.hidden=true;card.hidden=false;
+        root.querySelector('.sq-label').textContent='SPELLING';
+        root.querySelector('.sq-status').textContent=mode==='context'?'句中补词：根据剧情上下文拼出缺失单词。':'字母重组：把打乱的字母重新拼成单词。';
+        const prompt=root.querySelector('.sq-prompt'),box=root.querySelector('.sq-options'),feedback=root.querySelector('.sq-feedback');
+        prompt.replaceChildren();
+        const context=document.createElement('div');context.className='sq-prompt-main';
+        if(mode==='context') {
+            context.textContent=String(target.source||'').replace(/[A-Za-z][A-Za-z'’-]*/g,token=>token.toLowerCase()===target.word?'＿'.repeat(Math.min(8,target.word.length)):token);
+        } else {
+            let letters=target.word.split('').sort(()=>Math.random()-.5);
+            if(letters.join('').toLowerCase()===target.word.toLowerCase()) letters=target.word.split('').reverse();
+            context.textContent='字母顺序被打乱了：\n'+letters.join(' · ');
+        }
+        prompt.appendChild(context);
+        const hint=document.createElement('div');hint.className='sq-context';hint.textContent='提示：'+target.word.length+' 个字母 · 角色：'+target.speaker;prompt.appendChild(hint);
+        box.replaceChildren();feedback.textContent='';
+        const input=document.createElement('input');input.type='text';input.autocomplete='off';input.autocapitalize='none';input.spellcheck=false;input.placeholder='输入英文拼写';input.className='sq-url-input';input.style.marginTop='12px';input.setAttribute('aria-label','英文单词拼写答案');box.appendChild(input);
+        const submit=document.createElement('button');submit.type='button';submit.className='sq-option';submit.textContent='检查答案';submit.style.marginTop='8px';box.appendChild(submit);
+        const check=()=>{
+            if(submit.disabled)return;
+            const answer=input.value.trim();
+            if(!answer){feedback.textContent='先试着拼写一下吧。';input.focus();return;}
+            submit.disabled=true;input.disabled=true;
+            if(answer.toLowerCase()===target.word.toLowerCase()) {
+                markLearned(target);feedback.textContent='✓ 正确！ '+target.english;
+            } else {
+                markMistake(target,answer);feedback.textContent='再记一下：正确拼写是 '+target.english;
+            }
+            const next=document.createElement('button');next.type='button';next.className='sq-option';next.style.marginTop='8px';next.textContent='下一题 →';next.onclick=()=>buildSpelling(root,sources());box.appendChild(next);
+        };
+        submit.onclick=check;
+        input.addEventListener('keydown',e=>{if(e.key==='Enter')check();});
+        const skip=document.createElement('button');skip.type='button';skip.className='sq-option';skip.style.marginTop='8px';skip.textContent='跳过这题';skip.onclick=()=>buildSpelling(root,sources());box.appendChild(skip);
+    }
+
     function buildWord(root,listArg) {
         const list=listArg||sources();
         const pairs=list.flatMap(item=>englishPairs(item.line).map(pair=>({...pair,speaker:item.speaker,source:item.line,kind:item.kind})));
