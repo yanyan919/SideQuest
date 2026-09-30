@@ -820,6 +820,52 @@ export default 'SideQuest';
 
     }
 
+    function buildWordBank(root,listArg) {
+        const list=listArg||sources();
+        const words=extractedWords(list);
+        const empty=root.querySelector('.sq-empty'), card=root.querySelector('.sq-card'), menu=root.querySelector('.sq-game-menu'), status=root.querySelector('.sq-status');
+        if(!words.length) {
+            empty.hidden=false; card.hidden=true; menu.hidden=true;
+            status.textContent='最近的 AI 回复里暂时没有可收集的英文单词。';
+            return;
+        }
+        empty.hidden=true; menu.hidden=true; card.hidden=false;
+        root.querySelector('.sq-label').textContent='WORD COLLECTION';
+        status.textContent='从最近的 AI 回复中找到 '+words.length+' 个不同单词。点一个词查看原句。';
+        const prompt=root.querySelector('.sq-prompt'), box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
+        prompt.textContent='单词收集 · '+words.length+' 词';
+        box.replaceChildren(); feedback.textContent='';
+        const note=document.createElement('div'); note.className='sq-context'; note.textContent='只统计 AI/角色回复；常见功能词已过滤。单词来自最近聊天内容，不会修改原文。'; box.appendChild(note);
+        const grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px;';
+        words.slice(0,80).forEach(item=>{
+            const b=document.createElement('button'); b.type='button'; b.className='sq-option'; b.style.cssText='min-width:0;overflow-wrap:anywhere;text-align:left;';
+            b.textContent=item.english+(item.count>1?' ×'+item.count:'');
+            b.onclick=()=>buildWordDetail(root,item,list);
+            grid.appendChild(b);
+        });
+        box.appendChild(grid);
+        if(words.length>80){const more=document.createElement('div');more.className='sq-context';more.textContent='为保持界面轻量，本页最多显示 80 个词；当前列表按出现次数排序。';box.appendChild(more);}
+    }
+
+    function buildWordDetail(root,item,listArg) {
+        const prompt=root.querySelector('.sq-prompt'), box=root.querySelector('.sq-options'), feedback=root.querySelector('.sq-feedback');
+        root.querySelector('.sq-label').textContent='WORD DETAIL';
+        root.querySelector('.sq-status').textContent='来自 AI 回复的单词素材';
+        prompt.replaceChildren();
+        const row=document.createElement('div');row.className='sq-prompt-row';
+        const word=document.createElement('div');word.className='sq-prompt-main';word.style.cssText='font-size:23px;font-weight:800;';word.textContent=item.english;row.appendChild(word);
+        const speak=document.createElement('button');speak.type='button';speak.className='sq-inline-speak';speak.textContent='🔊';speak.title='听单词发音';speak.onclick=()=>speakFromPanel(item.english,root);row.appendChild(speak);prompt.appendChild(row);
+        const context=document.createElement('div');context.className='sq-context';context.textContent='原句：'+item.source;prompt.appendChild(context);
+        const source=document.createElement('div');source.className='sq-source';source.textContent='角色：'+item.speaker+' · 出现 '+item.count+' 次';prompt.appendChild(source);
+        box.replaceChildren();feedback.textContent='';
+        const save=document.createElement('button');save.type='button';save.className='sq-option';save.textContent='☆ 收藏 / 标记为已学';
+        save.onclick=()=>{markLearned(item);feedback.textContent='已加入学习记录。';};box.appendChild(save);
+        const back=document.createElement('button');back.type='button';back.className='sq-option';back.textContent='← 返回单词列表';
+        back.onclick=()=>buildWordBank(root,listArg||sources());box.appendChild(back);
+        const spell=document.createElement('button');spell.type='button';spell.className='sq-option';spell.textContent='✍️ 用这个词练习拼写';
+        spell.onclick=()=>{root.dataset.sqGame='spell';buildSpelling(root,listArg||sources(),item.word);};box.appendChild(spell);
+    }
+
     function buildWord(root,listArg) {
         const list=listArg||sources();
         const pairs=list.flatMap(item=>englishPairs(item.line).map(pair=>({...pair,speaker:item.speaker,source:item.line,kind:item.kind})));
