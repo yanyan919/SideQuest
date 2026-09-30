@@ -1925,9 +1925,8 @@ export default 'SideQuest';
         const container=document.getElementById('extensions_settings2') || document.getElementById('extensions_settings');
         if (!container || document.getElementById(SETTINGS_ID)) return;
 
-        const settings=loadSettings();
         if (context?.extensionSettings) {
-            context.extensionSettings.sidequest={...DEFAULTS,...settings};
+            context.extensionSettings.sidequest={...DEFAULTS,...loadSettings()};
             context.saveSettingsDebounced?.();
         }
 
@@ -1939,103 +1938,57 @@ export default 'SideQuest';
                 <b>SideQuest</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
             <div class="inline-drawer-content">
-                <label class="checkbox_label"><input type="checkbox" data-sq="enabled"><span>启用 SideQuest 悬浮窗</span></label>
-                <label class="sq-setting-label">当前学习档案</label>
-                <select class="sq-url-input" data-sq-profile></select>
-                <hr>
-                <details class="sq-details">
-                    <summary>题目素材</summary>
-                    <div class="sq-details-body">
-                        <label class="checkbox_label"><input type="checkbox" data-sq="includeCharacter"><span>角色对白</span></label>
-                        <label class="checkbox_label"><input type="checkbox" data-sq="includeNarration"><span>旁白</span></label>
-                    </div>
-                </details>
-                <details class="sq-details">
-                    <summary>抓取范围</summary>
-                    <div class="sq-details-body">
-                        <label class="sq-setting-label">从最近多少条聊天消息中抓取</label>
-                        <select class="sq-url-input" data-sq="sourceMessages">
-                            <option value="5">最近 5 条</option><option value="10">最近 10 条</option><option value="20">最近 20 条（默认）</option><option value="40">最近 40 条</option><option value="80">最近 80 条</option><option value="120">最近 120 条</option><option value="200">最近 200 条</option>
-                        </select>
-                        <div class="sq-note">优先使用最新消息；按 ST 消息条目计数。用户消息不会作为学习素材。</div>
-                    </div>
-                </details>
-                <details class="sq-details">
-                    <summary>语言模式与中文翻译</summary>
-                    <div class="sq-details-body">
-                        <label class="sq-setting-label">学习素材模式</label>
-                        <select class="sq-url-input" data-sq="translationMode">
-                            <option value="english">英语模式：只用已有英文素材</option>
-                            <option value="chinese">中文模式：把 AI 的中文回复翻译成英语</option>
-                            <option value="mixed">混合模式：已有英文 + 中文翻译</option>
-                        </select>
-                        <div class="sq-note">中文/混合模式会把符合条件的 AI 中文回复片段发送给 MyMemory 在线翻译服务；翻译结果缓存在本机浏览器。服务可能限流或翻译不准确，用户消息不会被发送。</div>
-                    </div>
-                </details>
-                <details class="sq-details">
-                    <summary>背景</summary>
-                    <div class="sq-details-body">
-                        <label class="sq-setting-label">背景图片 URL</label>
-                        <input class="sq-url-input" type="url" data-sq="backgroundUrl" placeholder="粘贴图片 URL">
-                        <div class="sq-note">留空就是默认玻璃面板。</div>
-                    </div>
-                </details>
+                <label class="checkbox_label"><input type="checkbox" data-sq-enabled><span>启用 SideQuest 悬浮窗</span></label>
+                <div class="sq-note">学习模式、素材范围、翻译、发音、背景和学习记录统一在 SideQuest 悬浮窗的设置里管理，避免两处设置互相覆盖。</div>
+                <button type="button" class="sq-mini-action" data-sq-open-settings>打开 SideQuest 设置</button>
             </div>`;
         container.appendChild(drawer);
 
-        const profileSelect=drawer.querySelector('[data-sq-profile]');
-        const syncDrawerProfile=()=>{
-            const data=loadProfiles();
-            profileSelect.innerHTML='';
-            data.profiles.forEach(p=>{
-                const option=document.createElement('option');
-                option.value=p.id; option.textContent=p.name; option.selected=p.id===activeProfileId();
-                profileSelect.appendChild(option);
-            });
+        const enabled=drawer.querySelector('[data-sq-enabled]');
+        enabled.checked=loadSettings().enabled!==false;
+        enabled.addEventListener('change',()=>{
             const current=loadSettings();
-            drawer.querySelectorAll('[data-sq]').forEach(input=>{
-                const key=input.dataset.sq;
-                if(input.type==='checkbox') input.checked=!!current[key];
-                else input.value=String(current[key]||'');
-            });
-        };
-        profileSelect?.addEventListener('change',()=>{
-            if(!switchActiveProfile(profileSelect.value)) return;
-            syncDrawerProfile();
-            const current=loadSettings();
-            const contextNow=ctx();
-            if(contextNow?.extensionSettings){ contextNow.extensionSettings.sidequest={...DEFAULTS,...current}; contextNow.saveSettingsDebounced?.(); }
-            applyPanelBackground(document.getElementById(PANEL_ID));
-            const panel=document.getElementById(PANEL_ID);
-            if(panel && panel.querySelector('.sq-settings')?.hidden===false){
-                panel.querySelectorAll('[data-key]').forEach(i=>{ if(i.type==='checkbox') i.checked=!!current[i.dataset.key]; else i.value=String(current[i.dataset.key]||''); });
-                renderProfileControls(panel); renderRecordManager(panel);
+            current.enabled=enabled.checked;
+            saveSettings(current);
+            if(context?.extensionSettings?.sidequest){
+                context.extensionSettings.sidequest.enabled=current.enabled;
+                context.saveSettingsDebounced?.();
             }
-            refreshOpenGame();
+            const fab=document.getElementById(FAB_ID);
+            const panel=document.getElementById(PANEL_ID);
+            if(fab) fab.toggleAttribute('hidden',!current.enabled);
+            if(!current.enabled && panel){
+                panel.classList.add('sq-hidden');
+                panel.style.setProperty('display','none','important');
+            }
         });
-        const current=loadSettings();
-        drawer.querySelectorAll('[data-sq]').forEach(input=>{
-            const key=input.dataset.sq;
-            if (input.type==='checkbox') input.checked=!!current[key];
-            else input.value=String(current[key]||'');
-            const update=()=>{
-                const current=loadSettings();
-                const value=input.type==='checkbox' ? input.checked : input.value.trim();
-                current[key]=value;
+
+        drawer.querySelector('[data-sq-open-settings]')?.addEventListener('click',()=>{
+            const current=loadSettings();
+            if(current.enabled===false){
+                current.enabled=true;
                 saveSettings(current);
-                if (context?.extensionSettings?.sidequest) {
-                    context.extensionSettings.sidequest[key]=current[key];
+                enabled.checked=true;
+                if(context?.extensionSettings?.sidequest){
+                    context.extensionSettings.sidequest.enabled=true;
                     context.saveSettingsDebounced?.();
                 }
-                applyPanelBackground(document.getElementById(PANEL_ID));
-                if (key==='enabled') {
-                    document.getElementById(FAB_ID)?.toggleAttribute('hidden',!current.enabled);
-                    if (!current.enabled) document.getElementById(PANEL_ID)?.classList.add('sq-hidden');
-                }
-            };
-            input.addEventListener(input.type==='checkbox' || input.tagName==='SELECT' ? 'change' : 'input',update);
+                document.getElementById(FAB_ID)?.removeAttribute('hidden');
+            }
+            const panel=document.getElementById(PANEL_ID);
+            if(!panel) return;
+            panel.classList.remove('sq-hidden');
+            panel.hidden=false;
+            panel.style.setProperty('display','flex','important');
+            panel.style.setProperty('visibility','visible','important');
+            panel.style.setProperty('opacity','1','important');
+            const fabRoot=document.getElementById('sidequest-root-v9');
+            const fabOrb=document.getElementById(FAB_ID);
+            if(fabRoot) fabRoot.style.setProperty('display','block','important');
+            if(fabOrb) fabOrb.style.setProperty('display','none','important');
+            applyMobileGeometry(panel);
+            panel.querySelector('[data-act="settings"]')?.click();
         });
-        syncDrawerProfile();
     }
 
     function syncSettingsAndUI() {
