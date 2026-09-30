@@ -795,7 +795,9 @@ export default 'SideQuest';
         if (mode === 'word') buildWord(panel);
         else if (mode === 'learn') buildLearn(panel);
         else if (mode === 'collect') buildWordBank(panel);
+        else if (mode === 'sentence') buildSentenceLab(panel);
         else if (mode === 'spell') buildSpelling(panel);
+        else if (mode === 'records') buildRecordBook(panel);
         else buildGame(panel);
     }
 
@@ -874,6 +876,7 @@ export default 'SideQuest';
     }
 
     function buildGame(root) {
+        root.dataset.sqGame='menu';
         const list=sources();
         const empty=root.querySelector('.sq-empty');
         const card=root.querySelector('.sq-card');
@@ -986,6 +989,7 @@ export default 'SideQuest';
         prompt.replaceChildren();box.replaceChildren();feedback.textContent='';
         const sentence=document.createElement('div');sentence.style.cssText='display:flex;flex-wrap:wrap;gap:5px;line-height:1.8;';
         let selected=null;
+        let dictionaryRequestId=0;
         const detail=document.createElement('div');detail.className='sq-card';detail.style.cssText='margin-top:12px;padding:12px;background:rgba(255,255,255,.035);';
         const detailWord=document.createElement('div');detailWord.style.cssText='font-size:21px;font-weight:800;';detailWord.textContent='点上方任意英文单词';detail.appendChild(detailWord);
         const detailPhon=document.createElement('div');detailPhon.className='sq-meaning';detailPhon.textContent='音标会在可用时自动查询';detail.appendChild(detailPhon);
@@ -1002,8 +1006,21 @@ export default 'SideQuest';
                 selected=raw.toLowerCase().replace(/[’]/g,"'");
                 detailWord.textContent=raw;detailPhon.textContent='音标：查询中…';
                 detailMeaning.textContent='结合整句语境理解这个词。';
-                hear.disabled=false;spell.disabled=selected.length<4||COMMON_WORDS.has(selected.replace(/['’]/g,''));
-                fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(selected)).then(r=>r.ok?r.json():null).then(data=>{const entry=Array.isArray(data)?data[0]:null;const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;detailPhon.textContent='音标：'+(phon||'暂未查到');const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;if(def)detailMeaning.textContent=def;}).catch(()=>{detailPhon.textContent='音标：暂不可用';});
+                hear.disabled=false;
+                const canSpell=selected.length>=4&&!COMMON_WORDS.has(selected.replace(/['’]/g,''))&&extractedWords(list).some(x=>x.word.toLowerCase().replace(/[’]/g,"'")===selected);
+                spell.disabled=!canSpell;
+                const requestId=++dictionaryRequestId;
+                fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(selected))
+                    .then(r=>r.ok?r.json():null)
+                    .then(data=>{
+                        if(requestId!==dictionaryRequestId)return;
+                        const entry=Array.isArray(data)?data[0]:null;
+                        const phon=entry?.phonetic||(entry?.phonetics||[]).find(x=>x.text)?.text;
+                        detailPhon.textContent='音标：'+(phon||'暂未查到');
+                        const def=(entry?.meanings||[]).flatMap(m=>m.definitions||[]).find(d=>d.definition)?.definition;
+                        if(def)detailMeaning.textContent=def;
+                    })
+                    .catch(()=>{if(requestId===dictionaryRequestId)detailPhon.textContent='音标：暂不可用';});
             };
             sentence.appendChild(token);
         });
@@ -1051,8 +1068,6 @@ export default 'SideQuest';
         notYet.onclick=()=>{ markMistake(item,'还不会'); feedback.textContent='没关系，记一下。'; setTimeout(()=>{ if(root.dataset.sqGame==='learn') buildLearn(root,sources()); },620); };
         actions.appendChild(learned); actions.appendChild(notYet);
         box.appendChild(actions);
-        const dissect=document.createElement('button');dissect.type='button';dissect.className='sq-option';dissect.textContent='🧩 拆解这句话';dissect.onclick=()=>{root.dataset.sqGame='sentence';buildSentenceLab(root,list);};box.appendChild(dissect);
-        const spelling=document.createElement('button');spelling.type='button';spelling.className='sq-option';spelling.textContent='✍️ 去练拼写';spelling.onclick=()=>{root.dataset.sqGame='spell';buildSpelling(root,list);};box.appendChild(spelling);
 
     }
 
@@ -1491,7 +1506,7 @@ export default 'SideQuest';
                                 <label class="sq-setting-label">音色 ID（可选）</label>
                                 <input class="sq-url-input" type="text" data-key="fishReferenceId" placeholder="reference_id；留空使用服务默认音色">
                                 <button type="button" class="sq-mini-action" data-act="tts-test">测试 Fish Audio 连接并试听</button>
-                                <div class="sq-note">官方云端接口默认使用 https://api.fish.audio/v1/tts。测试会实际合成一句英文，可能计入服务用量。若浏览器报告网络或 CORS 错误，可能需要 ST 后端代理，单改 URL 不能绕过跨域限制。</div>
+                                <div class="sq-note">请求路径：当前 ST 网页 → 同源 /proxy/ → Fish Audio 云端 /v1/tts → 音频返回浏览器播放。HTTP 500 表示代理或服务端返回错误，不等同于 iPhone 播放失败；如果只有首次在线合成后提示浏览器阻止播放，再点一次通常会命中缓存，但这属于 iOS 用户手势限制的可能表现。测试会实际合成英文并可能计入用量。</div>
                             </div>
                             <div data-tts-provider-panel="mimo" hidden>
                                 <label class="sq-setting-label">MiMo API URL</label>
@@ -1505,7 +1520,7 @@ export default 'SideQuest';
                                 <button type="button" class="sq-mini-action" data-act="tts-test">测试 MiMo 连接并试听</button>
                                 <div class="sq-note">尚未注册 MiMo 时可以先不填写。测试会发送一段英文到所选服务，可能计入用量。</div>
                             </div>
-                            <div class="sq-note">API Key 单独保存在当前浏览器的本地存储，不写入公开插件源码或 ST 扩展设置镜像，但并非加密保险箱。云端服务会收到测试文字或你点击朗读的学习文本。音频仅在当前页面内存缓存最多 20 条，刷新后清空。</div>
+                            <div class="sq-note">API Key 单独保存在当前浏览器的本地存储，不写入公开插件源码或 ST 扩展设置镜像，但并非加密保险箱。云端服务会收到测试文字或你点击朗读的学习文本。音频会优先缓存在本机 IndexedDB（最多 200 条 / 50 MiB），当前页面另有最多 20 条的临时缓存；不同浏览器或设备不共享缓存。</div>
                         </div>
                     </details>
                     <details class="sq-details">
