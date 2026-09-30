@@ -399,7 +399,8 @@ export default 'SideQuest';
         const variant=provider==='fish'?(settings.fishReferenceId||''):(settings.mimoVoice||'');
         return [provider,String(baseUrl||'').trim().replace(/\/+$/,''),provider==='fish'?settings.fishModel:settings.mimoModel,variant,text].join('\u241f');
     }
-    async function speakText(text, lang='en-US') {
+    async function speakText(text, lang='en-US', options={}) {
+        const bypassCache=options?.bypassCache===true;
         const spoken=String(text||'').replace(/[\u0000-\u001F\u007F]/g,' ').replace(/\s+/g,' ').trim();
         if(!spoken) return false;
         const settings=loadSettings();
@@ -422,8 +423,8 @@ export default 'SideQuest';
         if(!apiKey) throw new Error('请先在 SideQuest 设置中填写'+(provider==='fish'?'Fish Audio':'MiMo')+' API Key。');
 
         const cacheKey=ttsCacheKey(provider,spoken,settings);
-        let objectUrl=TTS_AUDIO_CACHE.get(cacheKey);
-        if(!objectUrl) {
+        let objectUrl=bypassCache?null:TTS_AUDIO_CACHE.get(cacheKey);
+        if(!objectUrl && !bypassCache) {
             const savedBlob=await getPersistentTtsBlob(cacheKey);
             if(savedBlob) {
                 objectUrl=URL.createObjectURL(savedBlob);
@@ -486,6 +487,12 @@ export default 'SideQuest';
                 blob=new Blob([bytes],{type:'audio/mpeg'});
             } else {
                 throw new Error('未知的 TTS 方式，请重新选择。');
+            }
+            if(bypassCache && activeTtsAudio) { activeTtsAudio.pause(); activeTtsAudio=null; }
+            if(bypassCache) {
+                const previousUrl=TTS_AUDIO_CACHE.get(cacheKey);
+                if(previousUrl) URL.revokeObjectURL(previousUrl);
+                TTS_AUDIO_CACHE.delete(cacheKey);
             }
             await putPersistentTtsBlob(cacheKey,blob);
             objectUrl=URL.createObjectURL(blob);
@@ -1643,7 +1650,7 @@ export default 'SideQuest';
             const provider=loadSettings().ttsProvider||'system';
             const status=panel.querySelector('.sq-status');
             status.textContent='正在连接 '+(provider==='fish'?'Fish Audio':provider==='mimo'?'MiMo':'系统语音')+' 并生成测试音频……';
-            speakText('Hello! This is a SideQuest voice test.').then(()=>{
+            speakText('Hello! This is a SideQuest voice test.','en-US',{bypassCache:true}).then(()=>{
                 status.textContent='请求已成功，正在播放测试音频。若没有声音，请检查设备音量和浏览器播放权限。';
             }).catch(error=>{
                 status.textContent=String(error?.message||'连接/试听失败。');
