@@ -1185,14 +1185,14 @@ export default 'SideQuest';
         prompt.replaceChildren();
         const context=document.createElement('div');context.className='sq-prompt-main';
         if(mode==='context') {
-            context.textContent=String(target.source||'').replace(/[A-Za-z][A-Za-z'’-]*/g,token=>token.toLowerCase()===target.word?'＿'.repeat(target.word.length):token);
+            context.textContent='题目：原句中有一个英文单词被挖空，请根据上下文填写。\n\n'+String(target.source||'').replace(/[A-Za-z][A-Za-z'’-]*/g,token=>token.toLowerCase()===target.word?'＿'.repeat(target.word.length):token);
         } else {
             let letters=target.word.split('').sort(()=>Math.random()-.5);
             if(letters.join('').toLowerCase()===target.word.toLowerCase()) letters=target.word.split('').reverse();
-            context.textContent='字母顺序被打乱了：\n'+letters.join(' · ');
+            context.textContent='题目：把下面打乱顺序的字母重新排列，拼出原单词。\n\n'+letters.join(' · ');
         }
         prompt.appendChild(context);
-        const hint=document.createElement('div');hint.className='sq-context';hint.textContent='提示：'+target.word.length+' 个字母 · 角色：'+target.speaker;prompt.appendChild(hint);
+        const hint=document.createElement('div');hint.className='sq-context';hint.textContent='答案长度：'+target.word.length+' 个字母'+(target.translation?' · 中文意思：'+target.translation:'')+' · 来源角色：'+target.speaker;prompt.appendChild(hint);
         box.replaceChildren();feedback.textContent='';
         const input=document.createElement('input');input.type='text';input.autocomplete='off';input.autocapitalize='none';input.spellcheck=false;input.placeholder='输入英文拼写';input.className='sq-url-input';input.style.marginTop='12px';input.setAttribute('aria-label','英文单词拼写答案');box.appendChild(input);
         const hintButton=document.createElement('button');hintButton.type='button';hintButton.className='sq-option';hintButton.textContent='💡 提示首字母';hintButton.style.marginTop='8px';hintButton.onclick=()=>{feedback.textContent='提示：首字母是 “'+target.word.charAt(0)+'”';};box.appendChild(hintButton);
@@ -1453,7 +1453,7 @@ export default 'SideQuest';
                 </div>
                 <div class="sq-settings" hidden>
                     <h3>SideQuest 设置</h3>
-                    <p>只读取 AI/角色回复正文；你的消息不会进入素材池。这里可以选择抓取对白或 AI 回复里的旁白。</p>
+                    <p>只读取 AI/角色回复正文，你发给 AI 的消息不会进入素材池。对白模式只抓取成对引号内部的文字；如需学习旁白，请单独勾选旁白选项。</p>
                     <details class="sq-details" open>
                         <summary>学习档案</summary>
                         <div class="sq-details-body">
