@@ -678,6 +678,27 @@ export default 'SideQuest';
         },1200);
     }
 
+    const COMMON_WORDS=new Set(('the a an and or but if then than so because as at by for from in into of on onto to with without about above after before between during through over under again once here there where when while who whom whose which what this that these those i me my mine we us our ours you your yours he him his she her hers it its they them their theirs am is are was were be been being do does did doing have has had having can could will would shall should may might must not no yes very too also just only even still already really quite rather almost ever never always often sometimes usually maybe perhaps all some any each every both few many much more most less least own same other another such s t re ve ll d m don doesn didn isn aren wasn weren won wouldn couldn shouldn cannot cant im youre hes shes theyre youll thats theres whats').split(/\s+/));
+    function extractedWords(list) {
+        const words=new Map();
+        for(const source of list||[]) {
+            const line=String(source.line||'').replace(/\[[a-z_-]{2,}\]/gi,' ');
+            const matches=line.match(/[A-Za-z][A-Za-z'’\-]{2,}/g)||[];
+            for(const raw of matches) {
+                const word=raw.replace(/^['’\-]+|['’\-]+$/g,'');
+                const normalized=word.toLowerCase().replace(/[’]/g,"'");
+                if(normalized.length<3 || COMMON_WORDS.has(normalized) || !/[aeiou]/i.test(normalized)) continue;
+                if(/^(.)\1{2,}$/i.test(normalized)) continue;
+                const key=normalized;
+                if(!words.has(key)) words.set(key,{english:word,word:normalized,translation:'',source:line,speaker:source.speaker||'Character',kind:source.kind||'narration',count:0,key:'word|'+key});
+                const item=words.get(key);
+                item.count++;
+                if(item.source.length<line.length) item.source=line;
+            }
+        }
+        return [...words.values()].sort((a,b)=>b.count-a.count||a.english.localeCompare(b.english));
+    }
+
     function buildGame(root) {
         const list=sources();
         if((loadSettings().translationMode||'english')!=='english') translateChineseSources(list);
