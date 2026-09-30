@@ -18,6 +18,7 @@ export default 'SideQuest';
         mistakeBook: true,
         repeatLearned: false,
         translationMode: 'english',
+        sourceMessages: 20,
         ttsProvider: 'system',
         fishBaseUrl: 'https://api.fish.audio',
         fishReferenceId: '',
@@ -281,7 +282,7 @@ export default 'SideQuest';
 
     function chatMessages() {
         const chat = ctx()?.chat;
-        return Array.isArray(chat) ? chat.filter(m => m && !m.is_system && m.mes).slice(-40) : [];
+        return Array.isArray(chat) ? chat.filter(m => m && !m.is_system && m.mes).slice(-200) : [];
     }
 
     function clean(value) {
@@ -366,7 +367,7 @@ export default 'SideQuest';
                 const fishType=String(response.headers.get('content-type')||'').toLowerCase();
                 blob=await response.blob();
                 if(!blob.size) throw new Error('Fish Audio 返回了空音频。');
-                if(fishType.includes('json') || fishType.includes('text/html')) {
+                if(fishType.includes('json') || fishType.includes('text/html') || (!fishType.startsWith('audio/') && !fishType.includes('octet-stream'))) {
                     const detail=(await blob.text().catch(()=>'' )).slice(0,160);
                     throw new Error('Fish Audio 返回的不是音频，而是 '+fishType+'。'+(detail?'接口信息：'+detail:'请检查 API URL 和服务器代理设置。'));
                 }
@@ -582,7 +583,8 @@ export default 'SideQuest';
             return n==='you' || n==='user' || n==='{{user}}' || (userName && n===userName);
         };
 
-        for(const message of chatMessages()){
+        const recentCount=Math.max(1,Math.min(200,Number(s.sourceMessages)||20));
+        for(const message of chatMessages().slice(-recentCount)){
             // 只从 AI/角色回复正文抓取；用户自己发给 AI 的消息永远不进题目池。
             if(message.is_user) continue;
 
@@ -751,17 +753,19 @@ export default 'SideQuest';
             for(const raw of matches) {
                 const word=raw.replace(/^['’\-]+|['’\-]+$/g,'');
                 const normalized=word.toLowerCase().replace(/[’]/g,"'");
-                if(normalized.length<3 || COMMON_WORDS.has(normalized) || !/[aeiou]/i.test(normalized)) continue;
+                if(normalized.length<3 || COMMON_WORDS.has(normalized.replace(/['’]/g,'')) || !/[aeiou]/i.test(normalized)) continue;
                 if(/^(.)\1{2,}$/i.test(normalized)) continue;
                 const key=normalized;
                 if(!words.has(key)) words.set(key,{english:word,word:normalized,translation:source.translation||'',source:source.source||line,speaker:source.speaker||'Character',kind:source.kind||'narration',count:0,key:'word|'+key});
                 const item=words.get(key);
-                item.count++;
+                if(!item._sourceKeys) item._sourceKeys=new Set();
+                const sourceKey=String(source.source||line)+'|'+String(source.speaker||'Character');
+                if(!item._sourceKeys.has(sourceKey)){ item._sourceKeys.add(sourceKey); item.count++; }
                 if(item.source.length<String(source.source||line).length) item.source=String(source.source||line);
                 if(!item.translation && source.translation) item.translation=source.translation;
             }
         }
-        return [...words.values()].sort((a,b)=>b.count-a.count||a.english.localeCompare(b.english));
+        return [...words.values()].map(item=>{ delete item._sourceKeys; return item; }).sort((a,b)=>b.count-a.count||a.english.localeCompare(b.english));
     }
 
     function buildGame(root) {
@@ -976,8 +980,8 @@ export default 'SideQuest';
             const next=document.createElement('button');next.type='button';next.className='sq-option';next.style.marginTop='8px';next.textContent='下一题 →';next.onclick=()=>buildSpelling(root,sources());box.appendChild(next);
         };
         submit.onclick=check;
-        input.addEventListener('keydown',e=>{if(e.key==='Enter')check();});
-        const skip=document.createElement('button');skip.type='button';skip.className='sq-option';skip.style.marginTop='8px';skip.textContent='跳过这题';skip.onclick=()=>buildSpelling(root,sources());box.appendChild(skip);
+        input.addEventListener('keydown',e=>{if(e.key==='Enter' && !e.isComposing){e.preventDefault();check();}});
+        // No adjacent skip button: avoid accidental taps discarding an unfinished attempt on mobile.
     }
 
     function buildWord(root,listArg) {
@@ -1210,6 +1214,16 @@ export default 'SideQuest';
                         <div class="sq-details-body">
                             <label class="sq-setting-row"><input type="checkbox" data-key="includeCharacter"><span>角色对白</span></label>
                             <label class="sq-setting-row"><input type="checkbox" data-key="includeNarration"><span>AI 回复里的旁白</span></label>
+                        </div>
+                    </details>
+                    <details class="sq-details">
+                        <summary>抓取范围</summary>
+                        <div class="sq-details-body">
+                            <label class="sq-setting-label">从最近多少条聊天消息中抓取</label>
+                            <select class="sq-url-input" data-key="sourceMessages">
+                                <option value="5">最近 5 条</option><option value="10">最近 10 条</option><option value="20">最近 20 条（默认）</option><option value="40">最近 40 条</option><option value="80">最近 80 条</option><option value="120">最近 120 条</option><option value="200">最近 200 条</option>
+                            </select>
+                            <div class="sq-note">优先使用最新聊天内容。按 ST 消息条目计数，包含角色回复和用户消息；用户消息不会被抓取成学习素材。</div>
                         </div>
                     </details>
                     <details class="sq-details" open>
@@ -1679,6 +1693,16 @@ export default 'SideQuest';
                     <div class="sq-details-body">
                         <label class="checkbox_label"><input type="checkbox" data-sq="includeCharacter"><span>角色对白</span></label>
                         <label class="checkbox_label"><input type="checkbox" data-sq="includeNarration"><span>旁白</span></label>
+                    </div>
+                </details>
+                <details class="sq-details">
+                    <summary>抓取范围</summary>
+                    <div class="sq-details-body">
+                        <label class="sq-setting-label">从最近多少条聊天消息中抓取</label>
+                        <select class="sq-url-input" data-sq="sourceMessages">
+                            <option value="5">最近 5 条</option><option value="10">最近 10 条</option><option value="20">最近 20 条（默认）</option><option value="40">最近 40 条</option><option value="80">最近 80 条</option><option value="120">最近 120 条</option><option value="200">最近 200 条</option>
+                        </select>
+                        <div class="sq-note">优先使用最新消息；按 ST 消息条目计数。用户消息不会作为学习素材。</div>
                     </div>
                 </details>
                 <details class="sq-details">
