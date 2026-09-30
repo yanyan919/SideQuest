@@ -71,24 +71,24 @@ export default 'SideQuest';
         #${PANEL_ID}.sq-hidden { display: none !important; }
         #${PANEL_ID} {
             background:linear-gradient(145deg,rgba(34,31,48,.94),rgba(24,31,39,.92));
-            border-color:rgba(204,190,255,.22);
+            border-color:rgba(155,182,180,.22);
             box-shadow:0 24px 80px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.07);
         }
-        #${PANEL_ID} .sq-head { background:linear-gradient(100deg,rgba(190,169,255,.10),rgba(148,226,211,.045)); border-bottom-color:rgba(210,201,255,.12); }
+        #${PANEL_ID} .sq-head { background:linear-gradient(100deg,rgba(150,178,176,.10),rgba(148,226,211,.045)); border-bottom-color:rgba(175,194,190,.12); }
         #${PANEL_ID} .sq-title { letter-spacing:.02em; }
         #${PANEL_ID} .sq-icon { border:1px solid rgba(255,255,255,.08); transition:background .16s ease,transform .16s ease; }
-        #${PANEL_ID} .sq-icon:hover { background:rgba(190,169,255,.18); }
+        #${PANEL_ID} .sq-icon:hover { background:rgba(150,178,176,.18); }
         #${PANEL_ID} .sq-game-choice {
-            background:linear-gradient(115deg,rgba(255,255,255,.065),rgba(190,169,255,.035));
-            border-color:rgba(205,194,255,.13); box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+            background:linear-gradient(115deg,rgba(255,255,255,.065),rgba(150,178,176,.035));
+            border-color:rgba(170,190,188,.13); box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
             transition:transform .16s ease,border-color .16s ease,background .16s ease;
         }
         #${PANEL_ID} .sq-game-choice:hover { transform:translateY(-1px); border-color:rgba(148,205,196,.42); background:rgba(148,205,196,.10); }
-        #${PANEL_ID} .sq-game-choice .sq-game-emoji { display:grid;place-items:center;height:42px;border-radius:13px;background:rgba(190,169,255,.09); }
-        #${PANEL_ID} .sq-card { background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(190,169,255,.035)); border-color:rgba(205,194,255,.15); box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
+        #${PANEL_ID} .sq-game-choice .sq-game-emoji { display:grid;place-items:center;height:42px;border-radius:13px;background:rgba(150,178,176,.09); }
+        #${PANEL_ID} .sq-card { background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(150,178,176,.035)); border-color:rgba(170,190,188,.15); box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
         #${PANEL_ID} .sq-label { color:#b7d8d2; opacity:.9; }
         #${PANEL_ID} .sq-prompt { background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.09); }
-        #${PANEL_ID} .sq-option, #${PANEL_ID} .sq-next, #${PANEL_ID} .sq-back { border-color:rgba(205,194,255,.13); background:linear-gradient(100deg,rgba(255,255,255,.065),rgba(190,169,255,.035)); transition:transform .14s ease,border-color .14s ease,background .14s ease; }
+        #${PANEL_ID} .sq-option, #${PANEL_ID} .sq-next, #${PANEL_ID} .sq-back { border-color:rgba(170,190,188,.13); background:linear-gradient(100deg,rgba(255,255,255,.065),rgba(150,178,176,.035)); transition:transform .14s ease,border-color .14s ease,background .14s ease; }
         #${PANEL_ID} .sq-option:not(:disabled):hover { border-color:rgba(148,205,196,.38); background:rgba(148,205,196,.10); }
         #${PANEL_ID} .sq-option:not(:disabled):active { transform:scale(.99); }
         #${PANEL_ID} .sq-inline-speak { background:rgba(148,205,196,.12); border:1px solid rgba(148,205,196,.22); }
@@ -1103,6 +1103,7 @@ export default 'SideQuest';
         const hint=document.createElement('div');hint.className='sq-context';hint.textContent='提示：'+target.word.length+' 个字母 · 角色：'+target.speaker;prompt.appendChild(hint);
         box.replaceChildren();feedback.textContent='';
         const input=document.createElement('input');input.type='text';input.autocomplete='off';input.autocapitalize='none';input.spellcheck=false;input.placeholder='输入英文拼写';input.className='sq-url-input';input.style.marginTop='12px';input.setAttribute('aria-label','英文单词拼写答案');box.appendChild(input);
+        const hintButton=document.createElement('button');hintButton.type='button';hintButton.className='sq-option';hintButton.textContent='💡 提示首字母';hintButton.style.marginTop='8px';hintButton.onclick=()=>{feedback.textContent='提示：首字母是 “'+target.word.charAt(0)+'”';};box.appendChild(hintButton);
         const submit=document.createElement('button');submit.type='button';submit.className='sq-option';submit.textContent='检查答案';submit.style.marginTop='8px';box.appendChild(submit);
         const check=()=>{
             if(submit.disabled)return;
