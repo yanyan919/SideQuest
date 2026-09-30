@@ -83,15 +83,15 @@ export default 'SideQuest';
             border-color:rgba(205,194,255,.13); box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
             transition:transform .16s ease,border-color .16s ease,background .16s ease;
         }
-        #${PANEL_ID} .sq-game-choice:hover { transform:translateY(-1px); border-color:rgba(198,180,255,.34); background:linear-gradient(115deg,rgba(190,169,255,.13),rgba(148,226,211,.07)); }
+        #${PANEL_ID} .sq-game-choice:hover { transform:translateY(-1px); border-color:rgba(148,205,196,.42); background:rgba(148,205,196,.10); }
         #${PANEL_ID} .sq-game-choice .sq-game-emoji { display:grid;place-items:center;height:42px;border-radius:13px;background:rgba(190,169,255,.09); }
         #${PANEL_ID} .sq-card { background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(190,169,255,.035)); border-color:rgba(205,194,255,.15); box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
-        #${PANEL_ID} .sq-label { color:#c9b8ff; opacity:.82; }
-        #${PANEL_ID} .sq-prompt { background:linear-gradient(135deg,rgba(0,0,0,.20),rgba(190,169,255,.055)); border:1px solid rgba(205,194,255,.08); }
+        #${PANEL_ID} .sq-label { color:#b7d8d2; opacity:.9; }
+        #${PANEL_ID} .sq-prompt { background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.09); }
         #${PANEL_ID} .sq-option, #${PANEL_ID} .sq-next, #${PANEL_ID} .sq-back { border-color:rgba(205,194,255,.13); background:linear-gradient(100deg,rgba(255,255,255,.065),rgba(190,169,255,.035)); transition:transform .14s ease,border-color .14s ease,background .14s ease; }
-        #${PANEL_ID} .sq-option:not(:disabled):hover { border-color:rgba(190,169,255,.35); background:rgba(190,169,255,.11); }
+        #${PANEL_ID} .sq-option:not(:disabled):hover { border-color:rgba(148,205,196,.38); background:rgba(148,205,196,.10); }
         #${PANEL_ID} .sq-option:not(:disabled):active { transform:scale(.99); }
-        #${PANEL_ID} .sq-inline-speak { background:rgba(190,169,255,.12); border:1px solid rgba(205,194,255,.13); }
+        #${PANEL_ID} .sq-inline-speak { background:rgba(148,205,196,.12); border:1px solid rgba(148,205,196,.22); }
         #${PANEL_ID} .sq-feedback { line-height:1.55; }
         #${PANEL_ID} .sq-head {
             display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -110,7 +110,7 @@ export default 'SideQuest';
             pointer-events:auto !important;
         }
         #${PANEL_ID} .sq-body { flex:1; min-height:0; overflow:auto; padding:16px; }
-        #${PANEL_ID} .sq-status { font-size:9px; opacity:.42; margin-bottom:9px; }
+        #${PANEL_ID} .sq-status { font-size:12px; opacity:.72; margin-bottom:10px; line-height:1.5; }
         #${PANEL_ID} .sq-empty { text-align:center; padding:50px 12px 20px; }
         #${PANEL_ID} .sq-empty-icon { font-size:34px; margin-bottom:9px; }
         #${PANEL_ID} .sq-empty-title { font-weight:750; font-size:16px; }
@@ -145,9 +145,9 @@ export default 'SideQuest';
             margin-top:7px; padding:2px 2px 0;
             color:inherit; font-size:11px; line-height:1.5; opacity:.62;
         }
-        #${PANEL_ID} .sq-context { margin-top:9px; font-size:10px; line-height:1.5; opacity:.48; }
-        #${PANEL_ID} .sq-source { margin-top:9px; font-size:9px; opacity:.38; line-height:1.45; }
-        #${PANEL_ID} .sq-record-note { margin-top:10px; padding:9px 10px; border-radius:10px; background:rgba(255,255,255,.035); font-size:10px; line-height:1.5; opacity:.58; }
+        #${PANEL_ID} .sq-context { margin-top:10px; font-size:13px; line-height:1.6; opacity:.72; overflow-wrap:anywhere; }
+        #${PANEL_ID} .sq-source { margin-top:10px; font-size:12px; opacity:.62; line-height:1.55; overflow-wrap:anywhere; }
+        #${PANEL_ID} .sq-record-note { margin-top:10px; padding:10px 11px; border-radius:10px; background:rgba(255,255,255,.035); font-size:12px; line-height:1.6; opacity:.72; }
         #${PANEL_ID} .sq-game-choice {
             width:100%; display:flex; align-items:center; gap:12px; box-sizing:border-box;
             padding:13px 12px; text-align:left; border:1px solid rgba(255,255,255,.10);
@@ -157,18 +157,18 @@ export default 'SideQuest';
         #${PANEL_ID} .sq-game-choice:active { transform:scale(.99); }
         #${PANEL_ID} .sq-game-choice .sq-game-emoji { width:34px; text-align:center; font-size:24px; flex:none; }
         #${PANEL_ID} .sq-game-choice span:nth-child(2) { min-width:0; flex:1; }
-        #${PANEL_ID} .sq-game-choice b { display:block; font-size:13px; }
-        #${PANEL_ID} .sq-game-choice small { display:block; margin-top:4px; font-size:10px; opacity:.52; line-height:1.4; }
-        #${PANEL_ID} .sq-game-choice em { display:inline-block; margin-top:5px; font-size:9px; font-style:normal; opacity:.4; }
+        #${PANEL_ID} .sq-game-choice b { display:block; font-size:16px; }
+        #${PANEL_ID} .sq-game-choice small { display:block; margin-top:5px; font-size:12px; opacity:.72; line-height:1.5; }
+        #${PANEL_ID} .sq-game-choice em { display:inline-block; margin-top:5px; font-size:11px; font-style:normal; opacity:.65; }
         #${PANEL_ID} .sq-card {
             position:relative; padding:13px; padding-top:17px;
             border:1px solid rgba(255,255,255,.09);
             border-radius:16px; background:rgba(255,255,255,.045);
         }
-        #${PANEL_ID} .sq-label { font-size:9px; letter-spacing:.14em; font-weight:800; opacity:.45; margin-bottom:10px; }
+        #${PANEL_ID} .sq-label { font-size:11px; letter-spacing:.12em; font-weight:800; opacity:.72; margin-bottom:10px; }
         #${PANEL_ID} .sq-prompt {
-            white-space:pre-wrap; padding:13px; border-radius:12px;
-            background:rgba(0,0,0,.16); font-size:13px; line-height:1.6;
+            white-space:pre-wrap; padding:14px; border-radius:12px;
+            background:rgba(0,0,0,.16); font-size:16px; line-height:1.7;
         }
         #${PANEL_ID} .sq-options { display:grid; gap:8px; margin-top:12px; }
         #${PANEL_ID} .sq-option, #${PANEL_ID} .sq-next, #${PANEL_ID} .sq-back {
@@ -176,11 +176,11 @@ export default 'SideQuest';
             border:1px solid rgba(255,255,255,.1); border-radius:10px;
             background:rgba(255,255,255,.055); color:#f2f2f2 !important; font:inherit; cursor:pointer;
         }
-        #${PANEL_ID} .sq-option { text-align:left; }
+        #${PANEL_ID} .sq-option { text-align:left; font-size:15px; line-height:1.5; min-height:42px; }
         #${PANEL_ID} .sq-option:disabled { opacity:.58; cursor:default; }
         #${PANEL_ID} .sq-ok { background:rgba(80,190,120,.2) !important; border-color:rgba(80,190,120,.4) !important; opacity:1 !important; }
         #${PANEL_ID} .sq-bad { background:rgba(210,90,90,.18) !important; border-color:rgba(210,90,90,.35) !important; opacity:1 !important; }
-        #${PANEL_ID} .sq-feedback { min-height:22px; margin:10px 2px; font-size:12px; }
+        #${PANEL_ID} .sq-feedback { min-height:24px; margin:12px 2px; font-size:14px; line-height:1.55; }
         #${PANEL_ID} .sq-settings { padding:2px 1px 10px; }
         #${PANEL_ID} .sq-settings h3 { margin:2px 0 5px; font-size:16px; }
         #${PANEL_ID} .sq-settings p { margin:0 0 14px; font-size:11px; opacity:.58; line-height:1.5; }
@@ -298,7 +298,72 @@ export default 'SideQuest';
 
     const TTS_SECRETS_KEY='sidequest_v9_tts_secrets';
     const TTS_AUDIO_CACHE=new Map();
+    const TTS_CACHE_DB='sidequest_tts_audio_v1';
+    const TTS_CACHE_STORE='audio';
+    const TTS_CACHE_MAX_ITEMS=40;
+    const TTS_CACHE_MAX_BYTES=20*1024*1024;
+    let ttsCacheDbPromise=null;
     let activeTtsAudio=null;
+
+    // IndexedDB stores audio Blobs across panel closes and page reloads.
+    // If unavailable or full, playback still works with the in-memory cache.
+    function openTtsCacheDb() {
+        if(!globalThis.indexedDB) return Promise.resolve(null);
+        if(ttsCacheDbPromise) return ttsCacheDbPromise;
+        ttsCacheDbPromise=new Promise(resolve=>{
+            try {
+                const request=indexedDB.open(TTS_CACHE_DB,1);
+                request.onupgradeneeded=()=>{
+                    const db=request.result;
+                    if(!db.objectStoreNames.contains(TTS_CACHE_STORE)) db.createObjectStore(TTS_CACHE_STORE,{keyPath:'key'});
+                };
+                request.onsuccess=()=>resolve(request.result);
+                request.onerror=()=>resolve(null);
+                request.onblocked=()=>resolve(null);
+            } catch { resolve(null); }
+        });
+        return ttsCacheDbPromise;
+    }
+
+    async function getPersistentTtsBlob(key) {
+        try {
+            const db=await openTtsCacheDb();
+            if(!db) return null;
+            return await new Promise(resolve=>{
+                const request=db.transaction(TTS_CACHE_STORE,'readonly').objectStore(TTS_CACHE_STORE).get(key);
+                request.onsuccess=()=>resolve(request.result?.blob instanceof Blob ? request.result.blob : null);
+                request.onerror=()=>resolve(null);
+            });
+        } catch { return null; }
+    }
+
+    async function putPersistentTtsBlob(key,blob) {
+        try {
+            const db=await openTtsCacheDb();
+            if(!db || !(blob instanceof Blob) || !blob.size || blob.size>TTS_CACHE_MAX_BYTES) return;
+            await new Promise(resolve=>{
+                const tx=db.transaction(TTS_CACHE_STORE,'readwrite');
+                tx.objectStore(TTS_CACHE_STORE).put({key,blob,size:blob.size,usedAt:Date.now()});
+                tx.oncomplete=resolve; tx.onerror=resolve; tx.onabort=resolve;
+            });
+            await new Promise(resolve=>{
+                const tx=db.transaction(TTS_CACHE_STORE,'readwrite');
+                const store=tx.objectStore(TTS_CACHE_STORE);
+                const request=store.getAll();
+                request.onsuccess=()=>{
+                    const items=(request.result||[]).sort((a,b)=>(a.usedAt||0)-(b.usedAt||0));
+                    let total=items.reduce((sum,item)=>sum+(Number(item.size)||item.blob?.size||0),0);
+                    while(items.length>TTS_CACHE_MAX_ITEMS || total>TTS_CACHE_MAX_BYTES) {
+                        const old=items.shift();
+                        if(!old) break;
+                        store.delete(old.key);
+                        total-=Number(old.size)||old.blob?.size||0;
+                    }
+                };
+                tx.oncomplete=resolve; tx.onerror=resolve; tx.onabort=resolve;
+            });
+        } catch {}
+    }
 
     function loadTtsSecrets() {
         try {
@@ -324,9 +389,10 @@ export default 'SideQuest';
     }
 
     function ttsCacheKey(provider,text,settings) {
-        return [provider,provider==='fish'?settings.fishModel:settings.mimoModel,provider==='fish'?settings.fishReferenceId:settings.mimoVoice,text].join('\u241f');
+        const baseUrl=provider==='fish'?settings.fishBaseUrl:settings.mimoBaseUrl;
+        const variant=provider==='fish'?(settings.fishReferenceId||''):(settings.mimoVoice||'');
+        return [provider,String(baseUrl||'').trim().replace(/\/+$/,''),provider==='fish'?settings.fishModel:settings.mimoModel,variant,text].join('\u241f');
     }
-
     async function speakText(text, lang='en-US') {
         const spoken=String(text||'').replace(/[\u0000-\u001F\u007F]/g,' ').replace(/\s+/g,' ').trim();
         if(!spoken) return false;
@@ -351,6 +417,13 @@ export default 'SideQuest';
 
         const cacheKey=ttsCacheKey(provider,spoken,settings);
         let objectUrl=TTS_AUDIO_CACHE.get(cacheKey);
+        if(!objectUrl) {
+            const savedBlob=await getPersistentTtsBlob(cacheKey);
+            if(savedBlob) {
+                objectUrl=URL.createObjectURL(savedBlob);
+                TTS_AUDIO_CACHE.set(cacheKey,objectUrl);
+            }
+        }
         if(!objectUrl) {
             let blob;
             if(provider==='fish') {
@@ -408,6 +481,7 @@ export default 'SideQuest';
             } else {
                 throw new Error('未知的 TTS 方式，请重新选择。');
             }
+            await putPersistentTtsBlob(cacheKey,blob);
             objectUrl=URL.createObjectURL(blob);
             TTS_AUDIO_CACHE.set(cacheKey,objectUrl);
             while(TTS_AUDIO_CACHE.size>20) {
@@ -942,7 +1016,22 @@ export default 'SideQuest';
         const grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px;';
         words.slice(0,80).forEach(item=>{
             const b=document.createElement('button'); b.type='button'; b.className='sq-option'; b.style.cssText='min-width:0;overflow-wrap:anywhere;text-align:left;';
-            b.textContent=item.english+(item.count>1?' ×'+item.count:'');
+            b.replaceChildren();
+            const wordLabel=document.createElement('span');
+            wordLabel.style.cssText='display:block;font-size:16px;font-weight:750;line-height:1.4;';
+            wordLabel.textContent=item.english;
+            b.appendChild(wordLabel);
+            if(item.translation){
+                const meaningLabel=document.createElement('span');
+                meaningLabel.style.cssText='display:block;margin-top:4px;font-size:13px;line-height:1.45;opacity:.78;';
+                meaningLabel.textContent=item.translation;
+                b.appendChild(meaningLabel);
+            }
+            const countLabel=document.createElement('span');
+            countLabel.style.cssText='display:block;margin-top:5px;font-size:11px;opacity:.62;';
+            countLabel.textContent='出现 '+item.count+' 次 · 点开查看原句';
+            b.appendChild(countLabel);
+            b.style.minHeight='72px';
             b.onclick=()=>buildWordDetail(root,item,list);
             grid.appendChild(b);
         });
@@ -1004,7 +1093,7 @@ export default 'SideQuest';
         prompt.replaceChildren();
         const context=document.createElement('div');context.className='sq-prompt-main';
         if(mode==='context') {
-            context.textContent=String(target.source||'').replace(/[A-Za-z][A-Za-z'’-]*/g,token=>token.toLowerCase()===target.word?'＿'.repeat(Math.min(8,target.word.length)):token);
+            context.textContent=String(target.source||'').replace(/[A-Za-z][A-Za-z'’-]*/g,token=>token.toLowerCase()===target.word?'＿'.repeat(target.word.length):token);
         } else {
             let letters=target.word.split('').sort(()=>Math.random()-.5);
             if(letters.join('').toLowerCase()===target.word.toLowerCase()) letters=target.word.split('').reverse();
