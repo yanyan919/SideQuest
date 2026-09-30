@@ -646,6 +646,8 @@ export default 'SideQuest';
         const mode=panel.dataset.sqGame || 'menu';
         if (mode === 'word') buildWord(panel);
         else if (mode === 'learn') buildLearn(panel);
+        else if (mode === 'collect') buildWordBank(panel);
+        else if (mode === 'spell') buildSpelling(panel);
         else buildGame(panel);
     }
 
@@ -722,6 +724,14 @@ export default 'SideQuest';
                 <span class="sq-game-emoji">📖</span>
                 <span><b>学习</b><small>先把剧情里不会的英文看懂、听懂</small></span>
             </button>
+            <button type="button" class="sq-game-choice" data-game="collect">
+                <span class="sq-game-emoji">🧲</span>
+                <span><b>单词收集</b><small>从 AI 剧情里抓取英文单词，点开查看出处</small></span>
+            </button>
+            <button type="button" class="sq-game-choice" data-game="spell">
+                <span class="sq-game-emoji">✍️</span>
+                <span><b>拼写挑战</b><small>根据剧情句子或打乱字母练习拼写</small></span>
+            </button>
             <button type="button" class="sq-game-choice" data-game="word">
                 <span class="sq-game-emoji">🔎</span>
                 <span><b>单词寻宝</b><small>从剧情里学词，再用语境确认意思</small></span>
@@ -747,6 +757,18 @@ export default 'SideQuest';
                     root.dataset.sqGame='learn';
                     root.querySelector('.sq-game-menu').hidden=true;
                     buildLearn(root,list);
+                    return;
+                }
+                if (game === 'collect') {
+                    root.dataset.sqGame='collect';
+                    root.querySelector('.sq-game-menu').hidden=true;
+                    buildWordBank(root,list);
+                    return;
+                }
+                if (game === 'spell') {
+                    root.dataset.sqGame='spell';
+                    root.querySelector('.sq-game-menu').hidden=true;
+                    buildSpelling(root,list);
                     return;
                 }
                 if (game !== 'word') return;
