@@ -141,7 +141,7 @@ export default 'SideQuest';
             background:rgba(255,255,255,.055); color:#fff !important; font-size:13px; cursor:pointer; opacity:.72;
         }
         #${PANEL_ID} .sq-inline-speak:active { transform:scale(.92); opacity:1; }
-        #\${PANEL_ID} .sq-meaning {
+        #${PANEL_ID} .sq-meaning {
             margin-top:7px; padding:2px 2px 0;
             color:inherit; font-size:11px; line-height:1.5; opacity:.62;
         }
@@ -453,7 +453,7 @@ export default 'SideQuest';
                 const hasMpegFrame=bytes.length>=2 && bytes[0]===0xFF && (bytes[1]&0xE0)===0xE0;
                 const looksLikeMp3=hasId3||hasMpegFrame;
                 const declaredNonAudio=fishType.includes('json') || fishType.includes('text/html') || fishType.startsWith('text/');
-                if(declaredNonAudio || (!fishType.startsWith('audio/') && !fishType.includes('octet-stream') && !looksLikeMp3)) {
+                if(declaredNonAudio || (!fishType.startsWith('audio/') && !looksLikeMp3)) {
                     const detail=(await blob.slice(0,160).text().catch(()=>'' )).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\uFFFF]/g,'�').slice(0,120);
                     throw new Error('Fish Audio 返回内容无法识别为音频（Content-Type: '+(fishType||'未提供')+'）。'+(detail?'响应开头：'+detail:'请检查 ST 代理和 API URL。'));
                 }
